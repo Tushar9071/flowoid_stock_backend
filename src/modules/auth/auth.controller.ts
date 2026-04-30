@@ -50,16 +50,19 @@ const parseOrThrow = <T>(schema: z.ZodSchema<T>, value: unknown): T => {
  * Helper to set authentication cookies
  */
 const setAuthCookies = (res: Response, tokens: any) => {
+	const isSecure = process.env.AUTH_COOKIE_SECURE === 'true';
+	const sameSite = (process.env.AUTH_COOKIE_SAME_SITE || 'lax') as 'lax' | 'strict' | 'none';
+
 	res.cookie('accessToken', tokens.accessToken, {
 		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
+		secure: isSecure,
+		sameSite: sameSite,
 		maxAge: tokens.accessTokenMaxAgeMs,
 	});
 	res.cookie('refreshToken', tokens.refreshToken, {
 		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
+		secure: isSecure,
+		sameSite: sameSite,
 		maxAge: tokens.refreshTokenMaxAgeMs,
 	});
 };
