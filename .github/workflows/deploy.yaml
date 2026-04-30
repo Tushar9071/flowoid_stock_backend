@@ -1,0 +1,99 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create .env file
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}" >> .env
+          echo "PORT=${{ secrets.PORT }}" >> .env
+          echo "JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}" >> .env
+          echo "JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}" >> .env
+          echo "JWT_ACCESS_EXPIRES_IN=${{ secrets.JWT_ACCESS_EXPIRES_IN }}" >> .env
+          echo "JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}" >> .env
+          echo "AUTH_COOKIE_SAME_SITE=${{ secrets.AUTH_COOKIE_SAME_SITE }}" >> .env
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+
+      - name: Build TypeScript
+        run: pnpm run build
+
+  deploy:
+    name: Deploy to Server
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: deploy
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+
+            cd /home/deploy/flow_imitation_backend
+
+            # Save current commit BEFORE pulling (for rollback)
+            git rev-parse HEAD > /home/deploy/.last_good_deploy
+
+            git pull origin main
+
+            pnpm install --frozen-lockfile
+            pnpm prisma generate
+            pnpm run build
+
+            pnpm prisma migrate deploy
+
+            pm2 reload ecosystem.config.js --update-env
+
+            # Health check (6 attempts, 5s apart = 30s total)
+            for i in $(seq 1 6); do
+              sleep 5
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health)
+              if [ "$STATUS" = "200" ]; then
+                echo "Deploy successful!"
+                exit 0
+              fi
+              echo "Attempt $i: got $STATUS..."
+            done
+
+            echo "Health check failed! Rolling back..."
+            PREV=$(cat /home/deploy/.last_good_deploy)
+            git checkout "$PREV"
+            pnpm install --frozen-lockfile
+            pnpm prisma generate
+            pnpm run build
+            pm2 reload ecosystem.config.js --update-env
+            echo "Rolled back to $PREV"
+            exit 1
