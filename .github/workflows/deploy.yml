@@ -73,7 +73,7 @@ jobs:
             pnpm prisma generate
             pnpm run build
 
-            pnpm prisma migrate deploy
+            # pnpm prisma migrate deploy
 
             pm2 reload ecosystem.config.js --update-env
 
