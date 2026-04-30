@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build:
@@ -67,7 +67,7 @@ jobs:
             # Save current commit BEFORE pulling (for rollback)
             git rev-parse HEAD > /home/deploy/flowoid_stock_backend/.last_good_deploy
 
-            git pull origin main
+            git pull origin master
 
             pnpm install --frozen-lockfile
             pnpm prisma generate

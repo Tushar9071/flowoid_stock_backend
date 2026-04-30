@@ -7,7 +7,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: "500M",
-      env_file: "/home/deploy/flow_imitation_backend/.env",
+      env_file: "/home/deploy/flowoid_stock_backend/.env",
       env: {
         NODE_ENV: "production",
         PORT: 3000,
