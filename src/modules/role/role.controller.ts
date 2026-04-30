@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import * as roleService from './role.service.ts';
-import { successResponse } from '../../utils/response.ts';
-import { validationError } from '../../common/errors/app-error.ts';
+import * as roleService from './role.service';
+import { successResponse } from '../../utils/response';
+import { validationError } from '../../common/errors/app-error';
 
 const createRoleSchema = z.object({
 	name: z.string().trim().min(2, 'Name must be at least 2 characters'),

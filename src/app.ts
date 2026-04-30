@@ -5,12 +5,11 @@ import type { Application } from "express";
 import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 
-import swaggerSpec from "./config/swagger.ts";
-import { errorHandler } from "./middleware/error.middleware.ts";
-import authRoutes from "./modules/auth/auth.routes.ts";
-import roleRoutes from "./modules/role/role.routes.ts";
-import permissionRoutes from "./modules/permission/permission.routes.ts";
-import { requireAuth } from "./middleware/auth.middleware.ts";
+import swaggerSpec from "./config/swagger";
+import { errorHandler } from "./middleware/error.middleware";
+import authRoutes from "./modules/auth/auth.routes";
+import roleRoutes from "./modules/role/role.routes";
+import permissionRoutes from "./modules/permission/permission.routes";
 
 const app: Application = express();
 

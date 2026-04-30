@@ -1,5 +1,5 @@
-import prisma from '../../lib/prisma.ts';
-import { validationError, notFoundError } from '../../common/errors/app-error.ts';
+import prisma from '../../lib/prisma';
+import { validationError, notFoundError } from '../../common/errors/app-error';
 
 type CreatePermissionInput = {
 	code: string;

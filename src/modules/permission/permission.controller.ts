@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
-import * as permissionService from "./permission.service.ts";
-import { successResponse } from "../../utils/response.ts";
-import { validationError } from "../../common/errors/app-error.ts";
+import * as permissionService from "./permission.service";
+import { successResponse } from "../../utils/response";
+import { validationError } from "../../common/errors/app-error";
 
 const createPermissionSchema = z.object({
   code: z.string().trim().min(3, "Code must be at least 3 characters"),

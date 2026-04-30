@@ -1,5 +1,5 @@
 import type {NextFunction, Request, Response } from 'express';
-import { isAppError } from '../common/errors/app-error.ts';
+import { isAppError } from '../common/errors/app-error';
 
 // Global error handler middleware
 export const errorHandler = (

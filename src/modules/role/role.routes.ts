@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import * as ctrl from './role.controller.ts';
-import { requireAuth } from '../../middleware/auth.middleware.ts';
-import { requirePermission } from '../../middleware/permission.middleware.ts';
+import * as ctrl from './role.controller';
+import { requireAuth } from '../../middleware/auth.middleware';
+import { requirePermission } from '../../middleware/permission.middleware';
 
 const router: Router = Router();
 

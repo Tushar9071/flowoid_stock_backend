@@ -1,10 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
-import { unauthorizedError, validationError } from '../../common/errors/app-error.ts';
-import type { AuthenticatedRequest } from '../../types/auth.types.ts';
-import { successResponse } from '../../utils/response.ts';
-import * as authService from './auth.service.ts';
+import { unauthorizedError, validationError } from '../../common/errors/app-error';
+import type { AuthenticatedRequest } from '../../types/auth.types';
+import { successResponse } from '../../utils/response';
+import * as authService from './auth.service';
 
 // ─── Validation Schemas ──────────────────────────────────────────
 

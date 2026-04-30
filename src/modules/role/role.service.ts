@@ -1,8 +1,8 @@
-import prisma from "../../lib/prisma.ts";
+import prisma from "../../lib/prisma";
 import {
   validationError,
   notFoundError,
-} from "../../common/errors/app-error.ts";
+} from "../../common/errors/app-error";
 
 type CreateRoleInput = {
   name: string;

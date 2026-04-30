@@ -6,17 +6,17 @@ import {
   forbiddenError,
   unauthorizedError,
   validationError,
-} from "../../common/errors/app-error.ts";
+} from "../../common/errors/app-error";
 import {
   ACCESS_TOKEN_SECRET,
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TOKEN_SECRET,
   REFRESH_TOKEN_TTL_SECONDS,
-} from "../../config/auth.ts";
-import prisma from "../../lib/prisma.ts";
-import { comparePassword, hashPassword } from "../../utils/password.ts";
-import type { JwtPayload } from "../../types/auth.types.ts";
-import { areTokenHashesEqual, hashToken } from "../../utils/auth.ts";
+} from "../../config/auth";
+import prisma from "../../lib/prisma";
+import { comparePassword, hashPassword } from "../../utils/password";
+import type { JwtPayload } from "../../types/auth.types";
+import { areTokenHashesEqual, hashToken } from "../../utils/auth";
 
 // ─── Types ───────────────────────────────────────────────────────
 

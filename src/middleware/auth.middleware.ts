@@ -1,9 +1,9 @@
 import type {NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
-import { unauthorizedError } from '../common/errors/app-error.ts';
-import { ACCESS_TOKEN_SECRET } from '../config/auth.ts';
-import type { AuthenticatedRequest, JwtPayload } from '../types/auth.types.ts';
+import { unauthorizedError } from '../common/errors/app-error';
+import { ACCESS_TOKEN_SECRET } from '../config/auth';
+import type { AuthenticatedRequest, JwtPayload } from '../types/auth.types';
 import { log } from 'console';
 
 /**

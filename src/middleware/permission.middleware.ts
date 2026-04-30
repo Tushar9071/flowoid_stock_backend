@@ -2,9 +2,9 @@ import type { NextFunction, Request, Response } from "express";
 import {
   forbiddenError,
   unauthorizedError,
-} from "../common/errors/app-error.ts";
-import prisma from "../lib/prisma.ts";
-import type { AuthenticatedRequest } from "../types/auth.types.ts";
+} from "../common/errors/app-error";
+import prisma from "../lib/prisma";
+import type { AuthenticatedRequest } from "../types/auth.types";
 
 export const requirePermission = (permissionCode: string) => {
   return async (
