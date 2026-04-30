@@ -62,10 +62,10 @@ jobs:
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 
-            cd /home/deploy/flow_imitation_backend
+            cd /home/deploy/flowoid_stock_backend
 
             # Save current commit BEFORE pulling (for rollback)
-            git rev-parse HEAD > /home/deploy/.last_good_deploy
+            git rev-parse HEAD > /home/deploy/flowoid_stock_backend/.last_good_deploy
 
             git pull origin main
 
@@ -89,7 +89,7 @@ jobs:
             done
 
             echo "Health check failed! Rolling back..."
-            PREV=$(cat /home/deploy/.last_good_deploy)
+            PREV=$(cat /home/deploy/flowoid_stock_backend/.last_good_deploy)
             git checkout "$PREV"
             pnpm install --frozen-lockfile
             pnpm prisma generate
