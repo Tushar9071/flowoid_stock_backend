@@ -7,7 +7,9 @@ import { validationError } from '../../common/errors/app-error';
 const createRoleSchema = z.object({
 	name: z.string().trim().min(2, 'Name must be at least 2 characters'),
 	description: z.string().optional(),
+	isActive: z.boolean().optional(),
 	isDefault: z.boolean().optional(),
+	isSystem: z.boolean().optional(),
 	permissionIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -16,6 +18,7 @@ const updateRoleSchema = z.object({
 	description: z.string().optional(),
 	isActive: z.boolean().optional(),
 	isDefault: z.boolean().optional(),
+	isSystem: z.boolean().optional(),
 	permissionIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -30,16 +33,16 @@ const parseOrThrow = <T>(schema: z.ZodSchema<T>, value: unknown): T => {
 export const createRole = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const input = parseOrThrow(createRoleSchema, req.body);
-		const role = await roleService.createRole(input);
+		const role = await roleService.createRole(input, (req as any).user);
 		successResponse(res, role, 201);
 	} catch (error) {
 		next(error);
 	}
 };
 
-export const getAllRoles = async (_req: Request, res: Response, next: NextFunction) => {
+export const getAllRoles = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const roles = await roleService.getAllRoles();
+		const roles = await roleService.getAllRoles((req as any).user);
 		successResponse(res, roles);
 	} catch (error) {
 		next(error);
@@ -49,7 +52,7 @@ export const getAllRoles = async (_req: Request, res: Response, next: NextFuncti
 export const getRoleById = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const { id } = req.params;
-		const role = await roleService.getRoleById(id);
+		const role = await roleService.getRoleById(id, (req as any).user);
 		successResponse(res, role);
 	} catch (error) {
 		next(error);
@@ -60,7 +63,7 @@ export const updateRole = async (req: Request, res: Response, next: NextFunction
 	try {
 		const { id } = req.params;
 		const input = parseOrThrow(updateRoleSchema, req.body);
-		const role = await roleService.updateRole(id, input);
+		const role = await roleService.updateRole(id, input, (req as any).user);
 		successResponse(res, role);
 	} catch (error) {
 		next(error);
@@ -70,7 +73,7 @@ export const updateRole = async (req: Request, res: Response, next: NextFunction
 export const deleteRole = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const { id } = req.params;
-		await roleService.deleteRole(id);
+		await roleService.deleteRole(id, (req as any).user);
 		successResponse(res, { message: 'Role deleted successfully' });
 	} catch (error) {
 		next(error);

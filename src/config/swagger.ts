@@ -93,14 +93,6 @@ const options: swaggerJsdoc.Options = {
           tags: ["Auth"],
           summary: "Refresh the current session",
           security: [{ refreshTokenCookie: [] }],
-          requestBody: {
-            required: false,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/RefreshRequest" },
-              },
-            },
-          },
           responses: {
             200: { $ref: "#/components/responses/AuthUserSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -111,14 +103,6 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ["Auth"],
           summary: "Log out and revoke refresh token",
-          requestBody: {
-            required: false,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/RefreshRequest" },
-              },
-            },
-          },
           responses: {
             200: { $ref: "#/components/responses/MessageSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -131,6 +115,25 @@ const options: swaggerJsdoc.Options = {
           summary: "Get current user profile",
           responses: {
             200: { $ref: "#/components/responses/UserSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+          },
+        },
+      },
+      "/api/auth/my-permissions": {
+        get: {
+          tags: ["Auth"],
+          summary: "Get current user permissions",
+          responses: {
+            200: {
+              description: "User permissions retrieved successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    $ref: "#/components/schemas/MyPermissionsResponse",
+                  },
+                },
+              },
+            },
             401: { $ref: "#/components/responses/UnauthorizedError" },
           },
         },
@@ -828,6 +831,12 @@ const options: swaggerJsdoc.Options = {
             },
             isSystem: { type: "boolean", example: false },
             isActive: { type: "boolean", example: true },
+            createdById: {
+              type: "string",
+              format: "uuid",
+              nullable: true,
+              description: "The user ID who created this role",
+            },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
             permissions: {

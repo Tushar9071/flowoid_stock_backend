@@ -1,5 +1,8 @@
 import prisma from '../../lib/prisma';
-import { validationError, notFoundError } from '../../common/errors/app-error';
+import { validationError, notFoundError, forbiddenError } from '../../common/errors/app-error';
+import { getMyPermissions } from '../auth/auth.service';
+
+type CurrentUser = { userId: string; role: string };
 
 type CreatePermissionInput = {
 	code: string;
@@ -12,7 +15,14 @@ type UpdatePermissionInput = {
 	description?: string;
 };
 
-export const createPermission = async (input: CreatePermissionInput) => {
+export const createPermission = async (input: CreatePermissionInput, currentUser: CurrentUser) => {
+	if (currentUser.role !== "SUPER_ADMIN") {
+		const userPermissions = await getMyPermissions(currentUser.userId);
+		if (!userPermissions.includes("permissions.manageAll")) {
+			throw forbiddenError("Only super admins can create system permissions");
+		}
+	}
+
 	const existing = await prisma.permission.findUnique({
 		where: { code: input.code },
 	});
@@ -26,13 +36,21 @@ export const createPermission = async (input: CreatePermissionInput) => {
 	});
 };
 
-export const getAllPermissions = async () => {
-	return prisma.permission.findMany({
+export const getAllPermissions = async (currentUser: CurrentUser) => {
+	const allPerms = await prisma.permission.findMany({
 		orderBy: { createdAt: 'desc' },
 	});
+
+	if (currentUser.role === "SUPER_ADMIN") {
+		return allPerms;
+	}
+
+	const userPermissions = await getMyPermissions(currentUser.userId);
+	// Normal users can only see the permissions they have, so they know what they can grant
+	return allPerms.filter(p => userPermissions.includes(p.code));
 };
 
-export const getPermissionById = async (id: string) => {
+export const getPermissionById = async (id: string, currentUser: CurrentUser) => {
 	const permission = await prisma.permission.findUnique({
 		where: { id },
 	});
@@ -41,11 +59,25 @@ export const getPermissionById = async (id: string) => {
 		throw notFoundError('Permission not found');
 	}
 
+	if (currentUser.role !== "SUPER_ADMIN") {
+		const userPermissions = await getMyPermissions(currentUser.userId);
+		if (!userPermissions.includes(permission.code) && !userPermissions.includes("permissions.manageAll")) {
+			throw forbiddenError("You do not have access to view this permission");
+		}
+	}
+
 	return permission;
 };
 
-export const updatePermission = async (id: string, input: UpdatePermissionInput) => {
-	await getPermissionById(id);
+export const updatePermission = async (id: string, input: UpdatePermissionInput, currentUser: CurrentUser) => {
+	if (currentUser.role !== "SUPER_ADMIN") {
+		const userPermissions = await getMyPermissions(currentUser.userId);
+		if (!userPermissions.includes("permissions.manageAll")) {
+			throw forbiddenError("Only super admins can modify system permissions");
+		}
+	}
+
+	await getPermissionById(id, currentUser);
 
 	return prisma.permission.update({
 		where: { id },
@@ -53,8 +85,15 @@ export const updatePermission = async (id: string, input: UpdatePermissionInput)
 	});
 };
 
-export const deletePermission = async (id: string) => {
-	await getPermissionById(id);
+export const deletePermission = async (id: string, currentUser: CurrentUser) => {
+	if (currentUser.role !== "SUPER_ADMIN") {
+		const userPermissions = await getMyPermissions(currentUser.userId);
+		if (!userPermissions.includes("permissions.manageAll")) {
+			throw forbiddenError("Only super admins can delete system permissions");
+		}
+	}
+
+	await getPermissionById(id, currentUser);
 
 	return prisma.permission.delete({
 		where: { id },

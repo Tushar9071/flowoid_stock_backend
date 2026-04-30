@@ -130,7 +130,7 @@ export const login = async (
 /**
  * @route   POST /api/auth/refresh
  * @desc    Rotate refresh token and issue fresh access token
- * @access  PUBLIC (requires valid refresh token in body)
+ * @access  PUBLIC (requires valid refresh token in cookies)
  */
 export const refresh = async (
 	req: Request,
@@ -138,10 +138,10 @@ export const refresh = async (
 	next: NextFunction,
 ): Promise<void> => {
 	try {
-		const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+		const refreshToken = req.cookies?.refreshToken;
 		if (!refreshToken || typeof refreshToken !== 'string') {
 			throw unauthorizedError(
-				'Refresh token is required in request body',
+				'Refresh token is missing from cookies',
 				'MISSING_REFRESH_TOKEN',
 			);
 		}
@@ -160,7 +160,7 @@ export const refresh = async (
 
 /**
  * @route   POST /api/auth/logout
- * @desc    Revoke the provided refresh token
+ * @desc    Revoke the refresh token stored in cookies
  * @access  AUTHENTICATED
  */
 export const logout = async (
@@ -169,7 +169,7 @@ export const logout = async (
 	next: NextFunction,
 ): Promise<void> => {
 	try {
-		const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+		const refreshToken = req.cookies?.refreshToken;
 		await authService.logout(refreshToken);
 		clearAuthCookies(res);
 		successResponse(res, { message: 'Logged out successfully' });

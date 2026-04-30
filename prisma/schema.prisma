@@ -20,6 +20,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   refreshTokens AuthRefreshToken[]
+  createdRoles  Role[]             @relation("CreatedRoles")
 
   @@map("users")
 }
@@ -48,6 +49,8 @@ model Role {
 
   permissions RolePermission[]
   users       User[]
+  createdBy   User?            @relation("CreatedRoles", fields: [createdById], references: [id])
+  createdById String?
 
 
   @@map("roles")

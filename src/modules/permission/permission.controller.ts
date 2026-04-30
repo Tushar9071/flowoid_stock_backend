@@ -34,7 +34,7 @@ export const createPermission = async (
 ) => {
   try {
     const input = parseOrThrow(createPermissionSchema, req.body);
-    const permission = await permissionService.createPermission(input);
+    const permission = await permissionService.createPermission(input, (req as any).user);
     successResponse(res, permission, 201);
   } catch (error) {
     next(error);
@@ -42,12 +42,12 @@ export const createPermission = async (
 };
 
 export const getAllPermissions = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const permissions = await permissionService.getAllPermissions();
+    const permissions = await permissionService.getAllPermissions((req as any).user);
     successResponse(res, permissions);
   } catch (error) {
     next(error);
@@ -61,7 +61,7 @@ export const getPermissionById = async (
 ) => {
   try {
     const { id } = req.params;
-    const permission = await permissionService.getPermissionById(id);
+    const permission = await permissionService.getPermissionById(id, (req as any).user);
     successResponse(res, permission);
   } catch (error) {
     next(error);
@@ -76,7 +76,7 @@ export const updatePermission = async (
   try {
     const { id } = req.params;
     const input = parseOrThrow(updatePermissionSchema, req.body);
-    const permission = await permissionService.updatePermission(id, input);
+    const permission = await permissionService.updatePermission(id, input, (req as any).user);
     successResponse(res, permission);
   } catch (error) {
     next(error);
@@ -90,7 +90,7 @@ export const deletePermission = async (
 ) => {
   try {
     const { id } = req.params;
-    await permissionService.deletePermission(id);
+    await permissionService.deletePermission(id, (req as any).user);
     successResponse(res, { message: "Permission deleted successfully" });
   } catch (error) {
     next(error);
