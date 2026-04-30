@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String?  @unique
+  phone        String   @unique
+  passwordHash String
+  roleId       String
+  role         Role    @relation(fields: [roleId], references: [id])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens AuthRefreshToken[]
+
+  @@map("users")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique    // e.g. "orders.create"
+  name        String               // e.g. "Create Orders"
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions      RolePermission[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String               // e.g. "SUPER_ADMIN", "TENANT_OWNER", "Cashier"
+  description String?
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       User[]
+
+
+  @@map("roles")
+}
+
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  grantedAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+
+
+model AuthRefreshToken {
+  id                String    @id
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  tokenHash         String    @unique
+  sessionId         String
+  userAgent         String?
+  ipAddress         String?
+  expiresAt         DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  revokedAt         DateTime?
+  revokedReason     String?
+  replacedByTokenId String?
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("auth_refresh_tokens")
+}
