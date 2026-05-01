@@ -23,6 +23,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Health", description: "Service health checks" },
       { name: "Auth", description: "Authentication and session management" },
       { name: "Tenants", description: "Tenant and business onboarding" },
+      { name: "Monitoring", description: "Admin system monitoring and live metrics" },
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
     ],
@@ -186,6 +187,19 @@ const options: swaggerJsdoc.Options = {
           responses: {
             200: { $ref: "#/components/responses/TenantListSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
+          },
+        },
+      },
+      "/api/monitoring/metrics": {
+        get: {
+          tags: ["Monitoring"],
+          summary: "Get current system metrics",
+          description:
+            "Admin-only snapshot endpoint. For live admin panel updates, connect Socket.IO to namespace /admin-monitoring and listen for metrics:update. Clients may emit metrics:refresh to request an immediate update.",
+          responses: {
+            200: { $ref: "#/components/responses/MonitoringMetricsSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
           },
         },
       },
@@ -386,6 +400,14 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/TenantListResponse" },
+            },
+          },
+        },
+        MonitoringMetricsSuccess: {
+          description: "System monitoring metrics response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/MonitoringMetricsResponse" },
             },
           },
         },
@@ -837,6 +859,81 @@ const options: swaggerJsdoc.Options = {
               type: "array",
               items: { $ref: "#/components/schemas/Tenant" },
             },
+          },
+          required: ["success", "data"],
+        },
+        MonitoringMetrics: {
+          type: "object",
+          properties: {
+            timestamp: { type: "string", format: "date-time" },
+            service: {
+              type: "object",
+              properties: {
+                uptimeSeconds: { type: "integer", example: 3600 },
+                pid: { type: "integer", example: 12345 },
+                nodeVersion: { type: "string", example: "v24.14.1" },
+                platform: { type: "string", example: "win32" },
+                startedAt: { type: "string", format: "date-time" },
+              },
+            },
+            system: {
+              type: "object",
+              properties: {
+                hostname: { type: "string", example: "server-01" },
+                cpuUsagePercent: { type: "number", example: 24.5 },
+                cpuCount: { type: "integer", example: 8 },
+                loadAverage: {
+                  type: "array",
+                  items: { type: "number" },
+                  example: [0, 0, 0],
+                },
+                totalMemoryMb: { type: "number", example: 16384 },
+                usedMemoryMb: { type: "number", example: 8192 },
+                freeMemoryMb: { type: "number", example: 8192 },
+                memoryUsagePercent: { type: "number", example: 50 },
+              },
+            },
+            process: {
+              type: "object",
+              properties: {
+                rssMb: { type: "number", example: 120.5 },
+                heapTotalMb: { type: "number", example: 64 },
+                heapUsedMb: { type: "number", example: 32.5 },
+                externalMb: { type: "number", example: 4.2 },
+              },
+            },
+            api: {
+              type: "object",
+              properties: {
+                totalRequests: { type: "integer", example: 1500 },
+                activeRequests: { type: "integer", example: 2 },
+                averageResponseTimeMs: { type: "number", example: 48.25 },
+                statusCodes: {
+                  type: "object",
+                  additionalProperties: { type: "integer" },
+                  example: { "200": 1400, "400": 50, "500": 2 },
+                },
+                routes: {
+                  type: "object",
+                  additionalProperties: { type: "integer" },
+                  example: { "GET /api/auth/me": 320 },
+                },
+              },
+            },
+            database: {
+              type: "object",
+              properties: {
+                status: { type: "string", enum: ["UP", "DOWN"] },
+                latencyMs: { type: "integer", example: 12 },
+              },
+            },
+          },
+        },
+        MonitoringMetricsResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/MonitoringMetrics" },
           },
           required: ["success", "data"],
         },

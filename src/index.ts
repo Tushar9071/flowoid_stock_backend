@@ -1,7 +1,9 @@
 import "dotenv/config";
 
+import http from "http";
 import app from "./app";
 import prisma from "./lib/prisma";
+import { initializeMonitoringSocket } from "./socket/monitoring.socket";
 
 const PORT = process.env.PORT || 3000;
 
@@ -10,7 +12,10 @@ async function main() {
   await prisma.$connect();
   console.log("✅ PostgreSQL connected via Prisma");
 
-  app.listen(PORT, () => {
+  const server = http.createServer(app);
+  initializeMonitoringSocket(server);
+
+  server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
   });
 }
