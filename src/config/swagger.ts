@@ -1,4 +1,3 @@
-// import { PlanType, TenantStatus } from '@prisma/client';
 import swaggerJsdoc from "swagger-jsdoc";
 
 const options: swaggerJsdoc.Options = {
@@ -23,6 +22,7 @@ const options: swaggerJsdoc.Options = {
     tags: [
       { name: "Health", description: "Service health checks" },
       { name: "Auth", description: "Authentication and session management" },
+      { name: "Tenants", description: "Tenant and business onboarding" },
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
     ],
@@ -153,6 +153,38 @@ const options: swaggerJsdoc.Options = {
           responses: {
             200: { $ref: "#/components/responses/MessageSuccess" },
             400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+          },
+        },
+      },
+      "/api/tenants": {
+        post: {
+          tags: ["Tenants"],
+          summary: "Create tenant after user registration",
+          description:
+            "Creates a business tenant for the authenticated user and links the user as the first tenant user.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateTenantRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/TenantSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/mine": {
+        get: {
+          tags: ["Tenants"],
+          summary: "List current user's tenants",
+          responses: {
+            200: { $ref: "#/components/responses/TenantListSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
           },
         },
@@ -341,6 +373,22 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        TenantSuccess: {
+          description: "Tenant response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/TenantResponse" },
+            },
+          },
+        },
+        TenantListSuccess: {
+          description: "Tenant list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/TenantListResponse" },
+            },
+          },
+        },
         RoleSuccess: {
           description: "Role response",
           content: {
@@ -432,7 +480,7 @@ const options: swaggerJsdoc.Options = {
       schemas: {
         RegisterRequest: {
           type: "object",
-          required: ["name", "phone", "password", "roleId"],
+          required: ["name", "phone", "password"],
           properties: {
             name: { type: "string", minLength: 2, example: "Ravi Shah" },
             email: {
@@ -447,7 +495,6 @@ const options: swaggerJsdoc.Options = {
               format: "password",
               example: "password123",
             },
-            roleId: { type: "string", format: "uuid" },
           },
         },
         LoginRequest: {
@@ -494,6 +541,43 @@ const options: swaggerJsdoc.Options = {
               minLength: 8,
               format: "password",
               example: "newPassword123",
+            },
+          },
+        },
+        CreateTenantRequest: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: {
+              type: "string",
+              minLength: 2,
+              example: "Ayanshi Imitation",
+            },
+            slug: {
+              type: "string",
+              minLength: 2,
+              example: "ayanshi-imitation",
+              description:
+                "Optional. If omitted, the backend generates a slug from the tenant name. The slug must be unique.",
+            },
+            email: {
+              type: "string",
+              format: "email",
+              example: "contact@ayanshi.com",
+            },
+            phone: { type: "string", minLength: 6, example: "9876543210" },
+            address: {
+              type: "string",
+              example: "Ahmedabad, Gujarat",
+            },
+            logoUrl: {
+              type: "string",
+              format: "uri",
+              example: "https://example.com/logo.png",
+            },
+            businessCategory: {
+              type: "string",
+              example: "Imitation Jewellery",
             },
           },
         },
@@ -659,8 +743,26 @@ const options: swaggerJsdoc.Options = {
             id: { type: "string", format: "uuid" },
             name: { type: "string", example: "Ayanshi Imitation" },
             slug: { type: "string", example: "ayanshi-imitation" },
-            // plan: { type: 'string', enum: Object.values(PlanType) },
-            // status: { type: 'string', enum: Object.values(TenantStatus) },
+            email: {
+              type: "string",
+              format: "email",
+              example: "contact@ayanshi.com",
+              nullable: true,
+            },
+            phone: {
+              type: "string",
+              example: "9876543210",
+              nullable: true,
+            },
+            address: {
+              type: "string",
+              example: "Ahmedabad, Gujarat",
+              nullable: true,
+            },
+            status: {
+              type: "string",
+              enum: ["TRIAL", "ACTIVE", "SUSPENDED", "CANCELLED"],
+            },
             trialEndsAt: {
               type: "string",
               format: "date-time",
@@ -671,7 +773,72 @@ const options: swaggerJsdoc.Options = {
               format: "date-time",
               nullable: true,
             },
+            logoUrl: {
+              type: "string",
+              format: "uri",
+              nullable: true,
+            },
+            businessCategory: {
+              type: "string",
+              example: "Imitation Jewellery",
+              nullable: true,
+            },
+            users: {
+              type: "array",
+              items: { $ref: "#/components/schemas/TenantUser" },
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
+        },
+        TenantUser: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            userId: { type: "string", format: "uuid" },
+            roleId: { type: "string", format: "uuid" },
+            isActive: { type: "boolean", example: true },
+            role: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "TENANT_OWNER" },
+              },
+            },
+            user: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Ravi Shah" },
+                email: {
+                  type: "string",
+                  format: "email",
+                  example: "ravi@flowoid.com",
+                  nullable: true,
+                },
+                phone: { type: "string", example: "9876543210" },
+              },
+            },
+          },
+        },
+        TenantResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/Tenant" },
+          },
+          required: ["success", "data"],
+        },
+        TenantListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/Tenant" },
+            },
+          },
+          required: ["success", "data"],
         },
         Worker: {
           type: "object",

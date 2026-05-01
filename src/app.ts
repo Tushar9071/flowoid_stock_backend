@@ -10,6 +10,7 @@ import { errorHandler } from "./middleware/error.middleware";
 import authRoutes from "./modules/auth/auth.routes";
 import roleRoutes from "./modules/role/role.routes";
 import permissionRoutes from "./modules/permission/permission.routes";
+import tenantRoutes from "./modules/tenant/tenant.routes";
 
 const app: Application = express();
 
@@ -52,6 +53,7 @@ app.use("/api/auth", authRoutes);
 
 // Future protected routes go here:
 // app.use('/api/users', requireAuth, userRoutes);
+app.use("/api/tenants", tenantRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
 
