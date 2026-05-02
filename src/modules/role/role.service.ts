@@ -33,6 +33,50 @@ const hasAllPermissions = (
   return requiredPermissions.every((p) => userPermissions.includes(p));
 };
 
+const getPermissionCodesOrThrow = async (permissionIds: string[]) => {
+  const uniquePermissionIds = [...new Set(permissionIds)];
+  const permissions = await prisma.permission.findMany({
+    where: { id: { in: uniquePermissionIds } },
+    select: { id: true, code: true },
+  });
+
+  if (permissions.length !== uniquePermissionIds.length) {
+    throw validationError("One or more permissions were not found");
+  }
+
+  return permissions.map((p) => p.code);
+};
+
+const assertCanAssignPermissions = async (
+  permissionIds: string[] | undefined,
+  currentUser: CurrentUser,
+) => {
+  if (!permissionIds || permissionIds.length === 0) {
+    return;
+  }
+
+  const requestedCodes = await getPermissionCodesOrThrow(permissionIds);
+
+  if (currentUser.role === "SUPER_ADMIN") {
+    return;
+  }
+
+  const userPermissions = await getMyPermissions(currentUser.userId);
+
+  if (!hasAllPermissions(userPermissions, requestedCodes)) {
+    throw forbiddenError("You cannot assign permissions you do not possess");
+  }
+};
+
+const rolePermissionsAreAssignable = (
+  role: { permissions: { permission: { code: string } }[] },
+  userPermissions: string[],
+) => {
+  return role.permissions.every((rp) =>
+    userPermissions.includes(rp.permission.code),
+  );
+};
+
 export const createRole = async (
   input: CreateRoleInput,
   currentUser: CurrentUser,
@@ -45,26 +89,11 @@ export const createRole = async (
     throw validationError("Role with this name already exists");
   }
 
-  // Check if non-admin is trying to assign permissions they don't have
-  if (
-    currentUser.role !== "SUPER_ADMIN" &&
-    input.permissionIds &&
-    input.permissionIds.length > 0
-  ) {
-    const userPermissions = await getMyPermissions(currentUser.userId);
-
-    // We need to fetch the codes for the requested permissionIds
-    const requestedPerms = await prisma.permission.findMany({
-      where: { id: { in: input.permissionIds } },
-      select: { code: true },
-    });
-
-    const requestedCodes = requestedPerms.map((p) => p.code);
-
-    if (!hasAllPermissions(userPermissions, requestedCodes)) {
-      throw forbiddenError("You cannot assign permissions you do not possess");
-    }
+  if (currentUser.role !== "SUPER_ADMIN" && (input.isSystem || input.isDefault)) {
+    throw forbiddenError("Only super admins can create system or default roles");
   }
+
+  await assertCanAssignPermissions(input.permissionIds, currentUser);
 
   return prisma.$transaction(async (tx) => {
     const role = await tx.role.create({
@@ -97,15 +126,16 @@ export const createRole = async (
 
 export const getAllRoles = async (currentUser: CurrentUser) => {
   let whereClause = {};
+  let userPermissions: string[] | undefined;
 
   if (currentUser.role !== "SUPER_ADMIN") {
-    const userPermissions = await getMyPermissions(currentUser.userId);
+    userPermissions = await getMyPermissions(currentUser.userId);
     if (!userPermissions.includes("roles.readAll")) {
       whereClause = { createdById: currentUser.userId };
     }
   }
 
-  return prisma.role.findMany({
+  const roles = await prisma.role.findMany({
     where: whereClause,
     include: {
       permissions: {
@@ -116,6 +146,15 @@ export const getAllRoles = async (currentUser: CurrentUser) => {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  if (currentUser.role === "SUPER_ADMIN" || !userPermissions) {
+    return roles;
+  }
+
+  return roles.filter((role) =>
+    role.name !== "SUPER_ADMIN" &&
+    rolePermissionsAreAssignable(role, userPermissions),
+  );
 };
 
 export const getRoleById = async (id: string, currentUser: CurrentUser) => {
@@ -142,6 +181,13 @@ export const getRoleById = async (id: string, currentUser: CurrentUser) => {
     ) {
       throw forbiddenError("You do not have access to view this role");
     }
+
+    if (
+      role.name === "SUPER_ADMIN" ||
+      !rolePermissionsAreAssignable(role, userPermissions)
+    ) {
+      throw forbiddenError("You do not have access to view this role");
+    }
   }
 
   return role;
@@ -158,6 +204,10 @@ export const updateRole = async (
     throw validationError("Cannot update name of a system role");
   }
 
+  if (currentUser.role !== "SUPER_ADMIN" && (input.isSystem !== undefined || input.isDefault !== undefined)) {
+    throw forbiddenError("Only super admins can update system or default role flags");
+  }
+
   if (currentUser.role !== "SUPER_ADMIN") {
     const userPermissions = await getMyPermissions(currentUser.userId);
     if (
@@ -167,18 +217,9 @@ export const updateRole = async (
       throw forbiddenError("You do not have permission to edit this role");
     }
 
-    if (input.permissionIds !== undefined && input.permissionIds.length > 0) {
-      const requestedPerms = await prisma.permission.findMany({
-        where: { id: { in: input.permissionIds } },
-        select: { code: true },
-      });
-      const requestedCodes = requestedPerms.map((p) => p.code);
-      if (!hasAllPermissions(userPermissions, requestedCodes)) {
-        throw forbiddenError(
-          "You cannot assign permissions you do not possess",
-        );
-      }
-    }
+    await assertCanAssignPermissions(input.permissionIds, currentUser);
+  } else {
+    await assertCanAssignPermissions(input.permissionIds, currentUser);
   }
 
   return prisma.$transaction(async (tx) => {

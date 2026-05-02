@@ -208,6 +208,8 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ["Users"],
           summary: "Create a user",
+          description:
+            "Creates a user. When roleId is provided, the authenticated user can only assign roles whose permissions are equal to or less than their own permissions. SUPER_ADMIN can assign any active role.",
           requestBody: {
             required: true,
             content: {
@@ -269,6 +271,8 @@ const options: swaggerJsdoc.Options = {
         put: {
           tags: ["Users"],
           summary: "Update a user",
+          description:
+            "Updates a user. When changing roleId, the authenticated user can only assign roles whose permissions are equal to or less than their own permissions. SUPER_ADMIN can assign any active role.",
           requestBody: {
             required: true,
             content: {
@@ -302,6 +306,8 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ["Roles"],
           summary: "Create a role",
+          description:
+            "Creates a role. Non-SUPER_ADMIN users can only include permissionIds they already have. Only SUPER_ADMIN can create system or default roles.",
           requestBody: {
             required: true,
             content: {
@@ -320,6 +326,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Roles"],
           summary: "List roles",
+          description:
+            "Lists roles visible to the authenticated user. Non-SUPER_ADMIN users only receive roles they can assign, meaning every permission on the role is already part of their own permissions.",
           responses: {
             200: { $ref: "#/components/responses/RoleListSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -332,6 +340,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Roles"],
           summary: "Get a role by ID",
+          description:
+            "Returns a role only if the authenticated user can view and assign it. Non-SUPER_ADMIN users cannot view roles with permissions beyond their own.",
           responses: {
             200: { $ref: "#/components/responses/RoleSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -342,6 +352,8 @@ const options: swaggerJsdoc.Options = {
         put: {
           tags: ["Roles"],
           summary: "Update a role",
+          description:
+            "Updates a role. Non-SUPER_ADMIN users can only assign permissionIds they already have and cannot update system or default role flags.",
           requestBody: {
             required: true,
             content: {
@@ -374,6 +386,7 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ["Permissions"],
           summary: "Create a permission",
+          description: "Creates a system permission. SUPER_ADMIN only.",
           requestBody: {
             required: true,
             content: {
@@ -394,6 +407,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Permissions"],
           summary: "List permissions",
+          description:
+            "Lists permissions the authenticated user can assign. SUPER_ADMIN receives all permissions; other users only receive permissions already granted to their own role.",
           responses: {
             200: { $ref: "#/components/responses/PermissionListSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -406,6 +421,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Permissions"],
           summary: "Get a permission by ID",
+          description:
+            "Returns a permission only if it is already granted to the authenticated user's role. SUPER_ADMIN can view any permission.",
           responses: {
             200: { $ref: "#/components/responses/PermissionSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -416,6 +433,7 @@ const options: swaggerJsdoc.Options = {
         put: {
           tags: ["Permissions"],
           summary: "Update a permission",
+          description: "Updates a system permission. SUPER_ADMIN only.",
           requestBody: {
             required: true,
             content: {
@@ -437,6 +455,7 @@ const options: swaggerJsdoc.Options = {
         delete: {
           tags: ["Permissions"],
           summary: "Delete a permission",
+          description: "Deletes a system permission. SUPER_ADMIN only.",
           responses: {
             200: { $ref: "#/components/responses/MessageSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -697,7 +716,8 @@ const options: swaggerJsdoc.Options = {
             roleId: {
               type: "string",
               format: "uuid",
-              description: "Optional. If omitted, the backend uses the active default role.",
+              description:
+                "Optional. If omitted, the backend uses the active default role. The selected role must not contain permissions beyond the authenticated user's own permissions, unless the authenticated user is SUPER_ADMIN.",
             },
             isActive: { type: "boolean", example: true },
           },
@@ -720,7 +740,12 @@ const options: swaggerJsdoc.Options = {
               description: "Optional admin password reset. Active sessions are revoked when changed.",
               example: "newPassword123",
             },
-            roleId: { type: "string", format: "uuid" },
+            roleId: {
+              type: "string",
+              format: "uuid",
+              description:
+                "The selected role must not contain permissions beyond the authenticated user's own permissions, unless the authenticated user is SUPER_ADMIN.",
+            },
             isActive: { type: "boolean", example: true },
           },
         },
@@ -773,6 +798,8 @@ const options: swaggerJsdoc.Options = {
             permissionIds: {
               type: "array",
               items: { type: "string", format: "uuid" },
+              description:
+                "Permission IDs to grant to this role. Non-SUPER_ADMIN users can only include permissions they already have.",
             },
           },
         },
@@ -788,6 +815,8 @@ const options: swaggerJsdoc.Options = {
             permissionIds: {
               type: "array",
               items: { type: "string", format: "uuid" },
+              description:
+                "Replacement permission IDs for this role. Non-SUPER_ADMIN users can only include permissions they already have.",
             },
           },
         },

@@ -1,7 +1,7 @@
 import prisma from "../../lib/prisma";
 import { forbiddenError, notFoundError, validationError } from "../../common/errors/app-error";
 import { hashPassword } from "../../utils/password";
-import { revokeAllSessionsForUser } from "../auth/auth.service";
+import { getMyPermissions, revokeAllSessionsForUser } from "../auth/auth.service";
 
 type CreateUserInput = {
   name: string;
@@ -69,14 +69,41 @@ const getDefaultRole = async () => {
   return defaultRole;
 };
 
-const assertRoleExists = async (roleId: string): Promise<void> => {
+const assertAssignableRole = async (
+  roleId: string,
+  currentUser: CurrentUser,
+): Promise<void> => {
   const role = await prisma.role.findFirst({
     where: { id: roleId, isActive: true },
-    select: { id: true },
+    include: {
+      permissions: {
+        include: {
+          permission: true,
+        },
+      },
+    },
   });
 
   if (!role) {
     throw validationError("Role not found or inactive");
+  }
+
+  if (currentUser.role === "SUPER_ADMIN") {
+    return;
+  }
+
+  if (role.name === "SUPER_ADMIN") {
+    throw forbiddenError("You cannot assign a role with more permissions than your own");
+  }
+
+  const currentUserPermissions = await getMyPermissions(currentUser.userId);
+  const targetRolePermissions = role.permissions.map((rp) => rp.permission.code);
+  const canAssignRole = targetRolePermissions.every((permission) =>
+    currentUserPermissions.includes(permission),
+  );
+
+  if (!canAssignRole) {
+    throw forbiddenError("You cannot assign a role with more permissions than your own");
   }
 };
 
@@ -114,11 +141,14 @@ const assertUniqueContact = async (
   }
 };
 
-export const createUser = async (input: CreateUserInput) => {
+export const createUser = async (
+  input: CreateUserInput,
+  currentUser: CurrentUser,
+) => {
   await assertUniqueContact({ phone: input.phone, email: input.email });
 
   const roleId = input.roleId || (await getDefaultRole()).id;
-  await assertRoleExists(roleId);
+  await assertAssignableRole(roleId, currentUser);
 
   const passwordHash = await hashPassword(input.password);
 
@@ -177,7 +207,7 @@ export const updateUser = async (
   await assertUniqueContact({ phone: input.phone, email: input.email }, id);
 
   if (input.roleId) {
-    await assertRoleExists(input.roleId);
+    await assertAssignableRole(input.roleId, currentUser);
   }
 
   if (currentUser.userId === id && input.isActive === false) {

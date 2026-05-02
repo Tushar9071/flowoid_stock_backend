@@ -46,8 +46,9 @@ export const createUser = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const input = parseOrThrow(createUserSchema, req.body);
-    const user = await userService.createUser(input);
+    const user = await userService.createUser(input, authReq.user);
 
     successResponse(res, user, 201);
   } catch (error) {
