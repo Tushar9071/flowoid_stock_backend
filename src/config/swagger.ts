@@ -26,6 +26,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Monitoring", description: "Admin system monitoring and live metrics" },
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
+      { name: "Parties", description: "Tenant-scoped party master, opening balance, and statements" },
     ],
     paths: {
       "/health": {
@@ -350,6 +351,288 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/parties": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["Parties"],
+          summary: "Create a party for a tenant",
+          description:
+            "Creates a dealer or supplier for the given tenant. If opening balance is provided, the API also creates the opening ledger entry automatically.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreatePartyRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/PartySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        get: {
+          tags: ["Parties"],
+          summary: "List parties for a tenant",
+          parameters: [
+            { $ref: "#/components/parameters/PartyPageQueryParam" },
+            { $ref: "#/components/parameters/PartyLimitQueryParam" },
+            { $ref: "#/components/parameters/PartySearchQueryParam" },
+            { $ref: "#/components/parameters/PartyTypeQueryParam" },
+            { $ref: "#/components/parameters/PartyIsActiveQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/PartyListSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/dropdown": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartySearchQueryParam" },
+          { $ref: "#/components/parameters/PartyTypeQueryParam" },
+          { $ref: "#/components/parameters/PartyIsActiveQueryParam" },
+          { $ref: "#/components/parameters/PartyDropdownLimitQueryParam" },
+        ],
+        get: {
+          tags: ["Parties"],
+          summary: "Get lightweight party dropdown data",
+          responses: {
+            200: { $ref: "#/components/responses/PartyDropdownSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/check-duplicate": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          {
+            name: "name",
+            in: "query",
+            schema: { type: "string" },
+            description: "Party name to check",
+          },
+          {
+            name: "phone",
+            in: "query",
+            schema: { type: "string" },
+            description: "Phone number to check",
+          },
+          {
+            name: "code",
+            in: "query",
+            schema: { type: "string" },
+            description: "Party code to check",
+          },
+          {
+            name: "gstin",
+            in: "query",
+            schema: { type: "string" },
+            description: "GSTIN to check",
+          },
+          {
+            name: "excludePartyId",
+            in: "query",
+            schema: { type: "string", format: "uuid" },
+            description: "Optional party ID to ignore during duplicate checks while updating",
+          },
+        ],
+        get: {
+          tags: ["Parties"],
+          summary: "Check duplicate party fields within a tenant",
+          description:
+            "At least one of name, phone, code, or gstin must be provided. Use excludePartyId during updates so the record does not match itself.",
+          responses: {
+            200: { $ref: "#/components/responses/PartyDuplicateCheckSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/{partyId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+        ],
+        get: {
+          tags: ["Parties"],
+          summary: "Get a party by ID",
+          responses: {
+            200: { $ref: "#/components/responses/PartySuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        put: {
+          tags: ["Parties"],
+          summary: "Update a party",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdatePartyRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/PartySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Parties"],
+          summary: "Soft delete a party",
+          description:
+            "Marks the party inactive and sets deletedAt. Ledger entries are preserved for accounting history.",
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/{partyId}/status": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+        ],
+        patch: {
+          tags: ["Parties"],
+          summary: "Activate or deactivate a party",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdatePartyStatusRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/PartySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/{partyId}/opening-balance": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+        ],
+        get: {
+          tags: ["Parties"],
+          summary: "Get opening balance details for a party",
+          responses: {
+            200: { $ref: "#/components/responses/OpeningBalanceSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Parties"],
+          summary: "Create opening balance for a party",
+          description:
+            "Use this only once. If an opening balance already exists, call the update endpoint instead.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateOpeningBalanceRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/PartySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        put: {
+          tags: ["Parties"],
+          summary: "Update opening balance for a party",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateOpeningBalanceRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/PartySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/{partyId}/statement": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+          { $ref: "#/components/parameters/StatementFromDateQueryParam" },
+          { $ref: "#/components/parameters/StatementToDateQueryParam" },
+          { $ref: "#/components/parameters/PartyPageQueryParam" },
+          { $ref: "#/components/parameters/StatementLimitQueryParam" },
+          { $ref: "#/components/parameters/IncludeOpeningEntryQueryParam" },
+        ],
+        get: {
+          tags: ["Parties"],
+          summary: "Get party statement",
+          responses: {
+            200: { $ref: "#/components/responses/PartyStatementSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/parties/{partyId}/ledger": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+          { $ref: "#/components/parameters/StatementFromDateQueryParam" },
+          { $ref: "#/components/parameters/StatementToDateQueryParam" },
+          { $ref: "#/components/parameters/PartyPageQueryParam" },
+          { $ref: "#/components/parameters/StatementLimitQueryParam" },
+          { $ref: "#/components/parameters/IncludeOpeningEntryQueryParam" },
+        ],
+        get: {
+          tags: ["Parties"],
+          summary: "Get party ledger",
+          description:
+            "Currently returns the same structure as the statement endpoint, sourced from party_ledger_entries.",
+          responses: {
+            200: { $ref: "#/components/responses/PartyStatementSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
     },
     components: {
       parameters: {
@@ -359,6 +642,80 @@ const options: swaggerJsdoc.Options = {
           required: true,
           schema: { type: "string", format: "uuid" },
           description: "Resource ID",
+        },
+        TenantIdPathParam: {
+          name: "tenantId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Tenant ID",
+        },
+        PartyIdPathParam: {
+          name: "partyId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Party ID",
+        },
+        PartyPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        PartyLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        StatementLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+          description: "Number of ledger entries per page",
+        },
+        PartyDropdownLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 25 },
+          description: "Maximum dropdown items to return",
+        },
+        PartySearchQueryParam: {
+          name: "search",
+          in: "query",
+          schema: { type: "string" },
+          description: "Free-text search across name, code, phone, email, GSTIN, and contact person",
+        },
+        PartyTypeQueryParam: {
+          name: "type",
+          in: "query",
+          schema: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+          description: "Filter by party type",
+        },
+        PartyIsActiveQueryParam: {
+          name: "isActive",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter by active or inactive status",
+        },
+        StatementFromDateQueryParam: {
+          name: "fromDate",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include ledger entries from this date-time onward",
+        },
+        StatementToDateQueryParam: {
+          name: "toDate",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include ledger entries up to this date-time",
+        },
+        IncludeOpeningEntryQueryParam: {
+          name: "includeOpeningEntry",
+          in: "query",
+          schema: { type: "boolean", default: true },
+          description: "Include or exclude the generated opening balance ledger entry",
         },
       },
       responses: {
@@ -440,6 +797,54 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/PermissionListResponse" },
+            },
+          },
+        },
+        PartySuccess: {
+          description: "Party response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PartyResponse" },
+            },
+          },
+        },
+        PartyListSuccess: {
+          description: "Paginated party list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PartyListResponse" },
+            },
+          },
+        },
+        PartyDropdownSuccess: {
+          description: "Lightweight dropdown list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PartyDropdownResponse" },
+            },
+          },
+        },
+        PartyDuplicateCheckSuccess: {
+          description: "Duplicate check response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PartyDuplicateCheckResponse" },
+            },
+          },
+        },
+        OpeningBalanceSuccess: {
+          description: "Opening balance response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OpeningBalanceResponse" },
+            },
+          },
+        },
+        PartyStatementSuccess: {
+          description: "Party statement or ledger response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PartyStatementResponse" },
             },
           },
         },
@@ -967,14 +1372,319 @@ const options: swaggerJsdoc.Options = {
           type: "object",
           properties: {
             id: { type: "string", format: "uuid" },
-            partyType: { type: "string", enum: ["DEALER", "SUPPLIER"] },
-            name: { type: "string", example: "Mehta Jewels" },
-            phone: { type: "string", example: "9712345678" },
-            city: { type: "string", example: "Surat" },
-            gstNumber: { type: "string", example: "24ABCDE1234F1Z5" },
-            creditLimit: { type: "string", example: "50000.00" },
-            creditDays: { type: "integer", example: 30 },
+            tenantId: { type: "string", format: "uuid" },
+            type: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+            name: { type: "string", example: "Shree Balaji Traders" },
+            code: { type: "string", example: "SBT001", nullable: true },
+            contactPerson: { type: "string", example: "Rohit Sharma", nullable: true },
+            phone: { type: "string", example: "9876543210", nullable: true },
+            alternatePhone: { type: "string", example: "9123456780", nullable: true },
+            email: { type: "string", format: "email", example: "balaji@example.com", nullable: true },
+            gstin: { type: "string", example: "24ABCDE1234F1Z5", nullable: true },
+            pan: { type: "string", example: "ABCDE1234F", nullable: true },
+            addressLine1: { type: "string", example: "Ring Road", nullable: true },
+            addressLine2: { type: "string", example: "Textile Market", nullable: true },
+            city: { type: "string", example: "Surat", nullable: true },
+            state: { type: "string", example: "Gujarat", nullable: true },
+            country: { type: "string", example: "India", nullable: true },
+            postalCode: { type: "string", example: "395002", nullable: true },
+            creditPeriodDays: { type: "integer", example: 30, nullable: true },
+            creditLimit: { type: "string", example: "150000", nullable: true },
+            openingBalance: { type: "string", example: "25000" },
+            openingBalanceType: { type: "string", enum: ["RECEIVABLE", "PAYABLE"] },
+            openingBalanceDate: { type: "string", format: "date-time", nullable: true },
+            notes: { type: "string", example: "Preferred dealer", nullable: true },
             isActive: { type: "boolean", example: true },
+            deletedAt: { type: "string", format: "date-time", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        CreatePartyRequest: {
+          type: "object",
+          required: ["type", "name"],
+          properties: {
+            type: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+            name: { type: "string", minLength: 2, example: "Shree Balaji Traders" },
+            code: { type: "string", example: "SBT001" },
+            contactPerson: { type: "string", example: "Rohit Sharma" },
+            phone: { type: "string", example: "9876543210" },
+            alternatePhone: { type: "string", example: "9123456780" },
+            email: { type: "string", format: "email", example: "balaji@example.com" },
+            gstin: { type: "string", example: "24ABCDE1234F1Z5" },
+            pan: { type: "string", example: "ABCDE1234F" },
+            addressLine1: { type: "string", example: "Ring Road" },
+            addressLine2: { type: "string", example: "Textile Market" },
+            city: { type: "string", example: "Surat" },
+            state: { type: "string", example: "Gujarat" },
+            country: { type: "string", example: "India" },
+            postalCode: { type: "string", example: "395002" },
+            creditPeriodDays: { type: "integer", minimum: 0, example: 30 },
+            creditLimit: { type: "number", minimum: 0, example: 150000 },
+            openingBalance: { type: "number", minimum: 0, example: 25000 },
+            openingBalanceType: { type: "string", enum: ["RECEIVABLE", "PAYABLE"], default: "RECEIVABLE" },
+            openingBalanceDate: { type: "string", format: "date-time", example: "2026-05-02T00:00:00.000Z" },
+            notes: { type: "string", example: "Preferred dealer" },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        UpdatePartyRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            type: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+            name: { type: "string", minLength: 2, example: "Shree Balaji Traders" },
+            code: { type: "string", example: "SBT001" },
+            contactPerson: { type: "string", example: "Amit Shah" },
+            phone: { type: "string", example: "9988776655" },
+            alternatePhone: { type: "string", example: "9123456780" },
+            email: { type: "string", format: "email", example: "balaji@example.com" },
+            gstin: { type: "string", example: "24ABCDE1234F1Z5" },
+            pan: { type: "string", example: "ABCDE1234F" },
+            addressLine1: { type: "string", example: "Ring Road" },
+            addressLine2: { type: "string", example: "Textile Market" },
+            city: { type: "string", example: "Surat" },
+            state: { type: "string", example: "Gujarat" },
+            country: { type: "string", example: "India" },
+            postalCode: { type: "string", example: "395002" },
+            creditPeriodDays: { type: "integer", minimum: 0, example: 45 },
+            creditLimit: { type: "number", minimum: 0, example: 200000 },
+            openingBalance: { type: "number", minimum: 0, example: 25000 },
+            openingBalanceType: { type: "string", enum: ["RECEIVABLE", "PAYABLE"] },
+            openingBalanceDate: { type: "string", format: "date-time", example: "2026-05-02T00:00:00.000Z" },
+            notes: { type: "string", example: "Updated credit limit" },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        UpdatePartyStatusRequest: {
+          type: "object",
+          required: ["isActive"],
+          properties: {
+            isActive: { type: "boolean", example: false },
+          },
+        },
+        CreateOpeningBalanceRequest: {
+          type: "object",
+          required: ["openingBalance", "openingBalanceType", "openingBalanceDate"],
+          properties: {
+            openingBalance: { type: "number", minimum: 0.01, example: 25000 },
+            openingBalanceType: { type: "string", enum: ["RECEIVABLE", "PAYABLE"] },
+            openingBalanceDate: { type: "string", format: "date-time", example: "2026-05-02T00:00:00.000Z" },
+            notes: { type: "string", example: "Initial opening balance" },
+          },
+        },
+        UpdateOpeningBalanceRequest: {
+          type: "object",
+          description: "Provide at least one field to update. Setting openingBalance to 0 removes the opening entry.",
+          properties: {
+            openingBalance: { type: "number", minimum: 0, example: 18000 },
+            openingBalanceType: { type: "string", enum: ["RECEIVABLE", "PAYABLE"] },
+            openingBalanceDate: { type: "string", format: "date-time", example: "2026-05-02T00:00:00.000Z" },
+            notes: { type: "string", example: "Adjusted after reconciliation" },
+          },
+        },
+        PartyPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        PartyResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/Party" },
+          },
+          required: ["success", "data"],
+        },
+        PartyListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Party" },
+                },
+                pagination: { $ref: "#/components/schemas/PartyPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        PartyDropdownItem: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            type: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+            name: { type: "string", example: "Shree Balaji Traders" },
+            code: { type: "string", example: "SBT001", nullable: true },
+            phone: { type: "string", example: "9876543210", nullable: true },
+            gstin: { type: "string", example: "24ABCDE1234F1Z5", nullable: true },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        PartyDropdownResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/PartyDropdownItem" },
+                },
+              },
+              required: ["items"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        PartyDuplicateCheckResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                exists: { type: "boolean", example: true },
+                duplicateBy: {
+                  type: "array",
+                  items: { type: "string", enum: ["name", "phone", "code", "gstin"] },
+                  example: ["name", "phone"],
+                },
+                party: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Shree Balaji Traders" },
+                    code: { type: "string", example: "SBT001", nullable: true },
+                    gstin: { type: "string", example: "24ABCDE1234F1Z5", nullable: true },
+                    phone: { type: "string", example: "9876543210", nullable: true },
+                  },
+                },
+                checkedFields: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", nullable: true, example: "Shree Balaji Traders" },
+                    phone: { type: "string", nullable: true, example: "9876543210" },
+                    code: { type: "string", nullable: true, example: "SBT001" },
+                    gstin: { type: "string", nullable: true, example: "24ABCDE1234F1Z5" },
+                  },
+                },
+              },
+              required: ["exists", "duplicateBy", "party", "checkedFields"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        PartyLedgerEntry: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            entryDate: { type: "string", format: "date-time" },
+            entryType: {
+              type: "string",
+              enum: [
+                "OPENING_BALANCE",
+                "SALE",
+                "PURCHASE",
+                "PAYMENT_RECEIVED",
+                "PAYMENT_MADE",
+                "CREDIT_NOTE",
+                "DEBIT_NOTE",
+                "ADJUSTMENT",
+                "JOURNAL",
+              ],
+            },
+            voucherType: { type: "string", nullable: true, example: "SALE_INVOICE" },
+            voucherId: { type: "string", nullable: true, example: "voucher-uuid" },
+            referenceNo: { type: "string", nullable: true, example: "INV-001" },
+            description: { type: "string", nullable: true, example: "Opening balance" },
+            debitAmount: { type: "string", example: "25000" },
+            creditAmount: { type: "string", example: "0" },
+            runningBalance: { type: "string", nullable: true, example: "25000" },
+            isOpeningEntry: { type: "boolean", example: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        OpeningBalanceResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                party: { $ref: "#/components/schemas/Party" },
+                hasOpeningBalance: { type: "boolean", example: true },
+                openingBalance: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "string", example: "25000" },
+                    type: { type: "string", enum: ["RECEIVABLE", "PAYABLE"] },
+                    date: { type: "string", format: "date-time", nullable: true },
+                    entry: {
+                      anyOf: [
+                        { $ref: "#/components/schemas/PartyLedgerEntry" },
+                        { type: "null" },
+                      ],
+                    },
+                  },
+                  required: ["amount", "type", "date", "entry"],
+                },
+              },
+              required: ["party", "hasOpeningBalance", "openingBalance"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        PartyStatementSummary: {
+          type: "object",
+          properties: {
+            balanceBeforePeriod: { type: "string", example: "25000" },
+            totalDebit: { type: "string", example: "10000" },
+            totalCredit: { type: "string", example: "5000" },
+            closingBalance: { type: "string", example: "30000" },
+            balanceNature: { type: "string", enum: ["RECEIVABLE", "PAYABLE", "SETTLED"] },
+          },
+        },
+        PartyStatementResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                party: { $ref: "#/components/schemas/Party" },
+                filters: {
+                  type: "object",
+                  properties: {
+                    fromDate: { type: "string", format: "date-time", nullable: true },
+                    toDate: { type: "string", format: "date-time", nullable: true },
+                    includeOpeningEntry: { type: "boolean", example: true },
+                  },
+                },
+                summary: { $ref: "#/components/schemas/PartyStatementSummary" },
+                entries: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/PartyLedgerEntry" },
+                },
+                pagination: { $ref: "#/components/schemas/PartyPagination" },
+              },
+              required: ["party", "filters", "summary", "entries", "pagination"],
+            },
           },
         },
         Order: {

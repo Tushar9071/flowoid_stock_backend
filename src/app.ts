@@ -8,11 +8,14 @@ import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger";
 import { errorHandler } from "./middleware/error.middleware";
 import { collectApiMetrics } from "./middleware/metrics.middleware";
+
 import authRoutes from "./modules/auth/auth.routes";
 import roleRoutes from "./modules/role/role.routes";
 import permissionRoutes from "./modules/permission/permission.routes";
 import tenantRoutes from "./modules/tenant/tenant.routes";
 import monitoringRoutes from "./modules/monitoring/monitoring.routes";
+import partiesRoute from "./modules/Parties/Parties.route";
+
 
 const app: Application = express();
 
@@ -53,13 +56,14 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-
 // Future protected routes go here:
 // app.use('/api/users', requireAuth, userRoutes);
 app.use("/api/tenants", tenantRoutes);
 app.use("/api/monitoring", monitoringRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
+app.use("/api/tenants/:tenantId/parties", partiesRoute);
+
 
 // Global error handler - always last
 app.use(errorHandler);

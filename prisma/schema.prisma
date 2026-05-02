@@ -25,6 +25,28 @@ model User {
   @@map("users")
 }
 
+enum PartyType {
+  DEALER
+  SUPPLIER
+}
+
+enum PartyOpeningBalanceType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum PartyLedgerEntryType {
+  OPENING_BALANCE
+  SALE
+  PURCHASE
+  PAYMENT_RECEIVED
+  PAYMENT_MADE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  ADJUSTMENT
+  JOURNAL
+}
+
 enum TenantStatus {
   TRIAL
   ACTIVE
@@ -47,9 +69,73 @@ model Tenant {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  users TenantUser[]
+  users              TenantUser[]
+  parties            Party[]
+  partyLedgerEntries PartyLedgerEntry[]
 
   @@map("tenants")
+}
+
+model Party {
+  id                 String                  @id @default(uuid())
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId           String
+  type               PartyType
+  name               String
+  code               String?
+  contactPerson      String?
+  phone              String?
+  alternatePhone     String?  
+  email              String?
+  gstin              String?
+  pan                String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  state              String?
+  country            String?
+  postalCode         String?
+  creditPeriodDays   Int?
+  creditLimit        Decimal?                @db.Decimal(18, 2)
+  openingBalance     Decimal                 @default(0) @db.Decimal(18, 2)
+  openingBalanceType PartyOpeningBalanceType @default(RECEIVABLE)
+  openingBalanceDate DateTime?
+  notes              String?
+  isActive           Boolean                 @default(true)
+  deletedAt          DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  ledgerEntries      PartyLedgerEntry[]
+
+  @@index([tenantId, type, isActive])
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+  @@map("parties")
+}
+
+model PartyLedgerEntry {
+  id             String               @id @default(uuid())
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId       String
+  party          Party                @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  partyId        String
+  entryDate      DateTime
+  entryType      PartyLedgerEntryType
+  voucherType    String?
+  voucherId      String?
+  referenceNo    String?
+  description    String?
+  debitAmount    Decimal              @default(0) @db.Decimal(18, 2)
+  creditAmount   Decimal              @default(0) @db.Decimal(18, 2)
+  runningBalance Decimal?             @db.Decimal(18, 2)
+  isOpeningEntry Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([tenantId, entryDate])
+  @@index([partyId, entryDate])
+  @@index([partyId, entryType])
+  @@map("party_ledger_entries")
 }
 
 model TenantUser {
