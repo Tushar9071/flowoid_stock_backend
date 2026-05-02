@@ -20,9 +20,9 @@ export const requirePermission = (permissionCode: string) => {
         throw unauthorizedError("Authentication required", "UNAUTHORIZED");
       }
 
-      if (user.role === "SUPER_ADMIN") {
-        return next();
-      }
+      // if (user.role === "SUPER_ADMIN") {
+      //   return next();
+      // }
 
       const role = await prisma.role.findFirst({
         where: { name: user.role, isActive: true },

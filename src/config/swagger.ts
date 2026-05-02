@@ -24,6 +24,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Auth", description: "Authentication and session management" },
       { name: "Tenants", description: "Tenant and business onboarding" },
       { name: "Monitoring", description: "Admin system monitoring and live metrics" },
+      { name: "Users", description: "User management" },
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
       { name: "Parties", description: "Tenant-scoped party master, opening balance, and statements" },
@@ -204,10 +205,110 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/users": {
+        post: {
+          tags: ["Users"],
+          summary: "Create a user",
+          description:
+            "Creates a user. When roleId is provided, the authenticated user can only assign roles whose permissions are equal to or less than their own permissions. SUPER_ADMIN can assign any active role.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateUserRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/UserManagementSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+        get: {
+          tags: ["Users"],
+          summary: "List users",
+          parameters: [
+            {
+              name: "search",
+              in: "query",
+              required: false,
+              schema: { type: "string" },
+              description: "Search by name, email, or phone",
+            },
+            {
+              name: "roleId",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "isActive",
+              in: "query",
+              required: false,
+              schema: { type: "boolean" },
+            },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementListSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/users/{id}": {
+        parameters: [{ $ref: "#/components/parameters/IdPathParam" }],
+        get: {
+          tags: ["Users"],
+          summary: "Get a user by ID",
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        put: {
+          tags: ["Users"],
+          summary: "Update a user",
+          description:
+            "Updates a user. When changing roleId, the authenticated user can only assign roles whose permissions are equal to or less than their own permissions. SUPER_ADMIN can assign any active role.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateUserRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Users"],
+          summary: "Deactivate a user",
+          description:
+            "Soft-deactivates the user and revokes active sessions. It does not hard-delete user history.",
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
       "/api/roles": {
         post: {
           tags: ["Roles"],
           summary: "Create a role",
+          description:
+            "Creates a role. Non-SUPER_ADMIN users can only include permissionIds they already have. Only SUPER_ADMIN can create system or default roles.",
           requestBody: {
             required: true,
             content: {
@@ -226,6 +327,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Roles"],
           summary: "List roles",
+          description:
+            "Lists roles visible to the authenticated user. Non-SUPER_ADMIN users only receive roles they can assign, meaning every permission on the role is already part of their own permissions.",
           responses: {
             200: { $ref: "#/components/responses/RoleListSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -238,6 +341,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Roles"],
           summary: "Get a role by ID",
+          description:
+            "Returns a role only if the authenticated user can view and assign it. Non-SUPER_ADMIN users cannot view roles with permissions beyond their own.",
           responses: {
             200: { $ref: "#/components/responses/RoleSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -248,6 +353,8 @@ const options: swaggerJsdoc.Options = {
         put: {
           tags: ["Roles"],
           summary: "Update a role",
+          description:
+            "Updates a role. Non-SUPER_ADMIN users can only assign permissionIds they already have and cannot update system or default role flags.",
           requestBody: {
             required: true,
             content: {
@@ -280,6 +387,7 @@ const options: swaggerJsdoc.Options = {
         post: {
           tags: ["Permissions"],
           summary: "Create a permission",
+          description: "Creates a system permission. SUPER_ADMIN only.",
           requestBody: {
             required: true,
             content: {
@@ -300,6 +408,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Permissions"],
           summary: "List permissions",
+          description:
+            "Lists permissions the authenticated user can assign. SUPER_ADMIN receives all permissions; other users only receive permissions already granted to their own role.",
           responses: {
             200: { $ref: "#/components/responses/PermissionListSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -312,6 +422,8 @@ const options: swaggerJsdoc.Options = {
         get: {
           tags: ["Permissions"],
           summary: "Get a permission by ID",
+          description:
+            "Returns a permission only if it is already granted to the authenticated user's role. SUPER_ADMIN can view any permission.",
           responses: {
             200: { $ref: "#/components/responses/PermissionSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -322,6 +434,7 @@ const options: swaggerJsdoc.Options = {
         put: {
           tags: ["Permissions"],
           summary: "Update a permission",
+          description: "Updates a system permission. SUPER_ADMIN only.",
           requestBody: {
             required: true,
             content: {
@@ -343,6 +456,7 @@ const options: swaggerJsdoc.Options = {
         delete: {
           tags: ["Permissions"],
           summary: "Delete a permission",
+          description: "Deletes a system permission. SUPER_ADMIN only.",
           responses: {
             200: { $ref: "#/components/responses/MessageSuccess" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
@@ -736,6 +850,22 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        UserManagementSuccess: {
+          description: "User management response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserManagementResponse" },
+            },
+          },
+        },
+        UserManagementListSuccess: {
+          description: "User management list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserManagementListResponse" },
+            },
+          },
+        },
         MessageSuccess: {
           description: "Message response",
           content: {
@@ -971,6 +1101,59 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        CreateUserRequest: {
+          type: "object",
+          required: ["name", "phone", "password"],
+          properties: {
+            name: { type: "string", minLength: 2, example: "Vatsal Shah" },
+            email: {
+              type: "string",
+              format: "email",
+              example: "vatsal@flowoid.com",
+            },
+            phone: { type: "string", minLength: 6, example: "9876543210" },
+            password: {
+              type: "string",
+              minLength: 8,
+              format: "password",
+              example: "password123",
+            },
+            roleId: {
+              type: "string",
+              format: "uuid",
+              description:
+                "Optional. If omitted, the backend uses the active default role. The selected role must not contain permissions beyond the authenticated user's own permissions, unless the authenticated user is SUPER_ADMIN.",
+            },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        UpdateUserRequest: {
+          type: "object",
+          properties: {
+            name: { type: "string", minLength: 2, example: "Vatsal Shah" },
+            email: {
+              type: "string",
+              format: "email",
+              nullable: true,
+              example: "vatsal@flowoid.com",
+            },
+            phone: { type: "string", minLength: 6, example: "9876543210" },
+            password: {
+              type: "string",
+              minLength: 8,
+              format: "password",
+              description: "Optional admin password reset. Active sessions are revoked when changed.",
+              example: "newPassword123",
+            },
+            roleId: {
+              type: "string",
+              format: "uuid",
+              description:
+                "The selected role must not contain permissions beyond the authenticated user's own permissions, unless the authenticated user is SUPER_ADMIN.",
+            },
+            isActive: { type: "boolean", example: true },
+          },
+        },
         CreateTenantRequest: {
           type: "object",
           required: ["name"],
@@ -1020,6 +1203,8 @@ const options: swaggerJsdoc.Options = {
             permissionIds: {
               type: "array",
               items: { type: "string", format: "uuid" },
+              description:
+                "Permission IDs to grant to this role. Non-SUPER_ADMIN users can only include permissions they already have.",
             },
           },
         },
@@ -1035,6 +1220,8 @@ const options: swaggerJsdoc.Options = {
             permissionIds: {
               type: "array",
               items: { type: "string", format: "uuid" },
+              description:
+                "Replacement permission IDs for this role. Non-SUPER_ADMIN users can only include permissions they already have.",
             },
           },
         },
@@ -1163,6 +1350,84 @@ const options: swaggerJsdoc.Options = {
             phone: { type: "string", example: "9876543210" },
             role: { type: "string", example: "SUPER_ADMIN" },
           },
+        },
+        ManagedUser: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Vatsal Shah" },
+            email: {
+              type: "string",
+              format: "email",
+              example: "vatsal@flowoid.com",
+              nullable: true,
+            },
+            phone: { type: "string", example: "9876543210" },
+            roleId: { type: "string", format: "uuid" },
+            role: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "FREE_USERS" },
+                description: {
+                  type: "string",
+                  nullable: true,
+                  example: "Free plan users",
+                },
+              },
+            },
+            isActive: { type: "boolean", example: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            tenantUsers: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string", format: "uuid" },
+                  isActive: { type: "boolean", example: true },
+                  tenant: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      name: { type: "string", example: "Ayanshi Imitation" },
+                      slug: { type: "string", example: "ayanshi-imitation" },
+                      status: {
+                        type: "string",
+                        enum: ["TRIAL", "ACTIVE", "SUSPENDED", "CANCELLED"],
+                      },
+                    },
+                  },
+                  role: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      name: { type: "string", example: "FREE_USERS" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        UserManagementResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/ManagedUser" },
+          },
+          required: ["success", "data"],
+        },
+        UserManagementListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/ManagedUser" },
+            },
+          },
+          required: ["success", "data"],
         },
         Tenant: {
           type: "object",

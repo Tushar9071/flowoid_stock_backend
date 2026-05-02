@@ -17,10 +17,7 @@ type UpdatePermissionInput = {
 
 export const createPermission = async (input: CreatePermissionInput, currentUser: CurrentUser) => {
 	if (currentUser.role !== "SUPER_ADMIN") {
-		const userPermissions = await getMyPermissions(currentUser.userId);
-		if (!userPermissions.includes("permissions.manageAll")) {
-			throw forbiddenError("Only super admins can create system permissions");
-		}
+		throw forbiddenError("Only super admins can create system permissions");
 	}
 
 	const existing = await prisma.permission.findUnique({
@@ -61,7 +58,7 @@ export const getPermissionById = async (id: string, currentUser: CurrentUser) =>
 
 	if (currentUser.role !== "SUPER_ADMIN") {
 		const userPermissions = await getMyPermissions(currentUser.userId);
-		if (!userPermissions.includes(permission.code) && !userPermissions.includes("permissions.manageAll")) {
+		if (!userPermissions.includes(permission.code)) {
 			throw forbiddenError("You do not have access to view this permission");
 		}
 	}
@@ -71,10 +68,7 @@ export const getPermissionById = async (id: string, currentUser: CurrentUser) =>
 
 export const updatePermission = async (id: string, input: UpdatePermissionInput, currentUser: CurrentUser) => {
 	if (currentUser.role !== "SUPER_ADMIN") {
-		const userPermissions = await getMyPermissions(currentUser.userId);
-		if (!userPermissions.includes("permissions.manageAll")) {
-			throw forbiddenError("Only super admins can modify system permissions");
-		}
+		throw forbiddenError("Only super admins can modify system permissions");
 	}
 
 	await getPermissionById(id, currentUser);
@@ -87,10 +81,7 @@ export const updatePermission = async (id: string, input: UpdatePermissionInput,
 
 export const deletePermission = async (id: string, currentUser: CurrentUser) => {
 	if (currentUser.role !== "SUPER_ADMIN") {
-		const userPermissions = await getMyPermissions(currentUser.userId);
-		if (!userPermissions.includes("permissions.manageAll")) {
-			throw forbiddenError("Only super admins can delete system permissions");
-		}
+		throw forbiddenError("Only super admins can delete system permissions");
 	}
 
 	await getPermissionById(id, currentUser);
