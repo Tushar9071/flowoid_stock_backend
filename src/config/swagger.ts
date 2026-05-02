@@ -24,6 +24,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Auth", description: "Authentication and session management" },
       { name: "Tenants", description: "Tenant and business onboarding" },
       { name: "Monitoring", description: "Admin system monitoring and live metrics" },
+      { name: "Users", description: "User management" },
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
     ],
@@ -203,6 +204,100 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/users": {
+        post: {
+          tags: ["Users"],
+          summary: "Create a user",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateUserRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/UserManagementSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+        get: {
+          tags: ["Users"],
+          summary: "List users",
+          parameters: [
+            {
+              name: "search",
+              in: "query",
+              required: false,
+              schema: { type: "string" },
+              description: "Search by name, email, or phone",
+            },
+            {
+              name: "roleId",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "isActive",
+              in: "query",
+              required: false,
+              schema: { type: "boolean" },
+            },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementListSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/users/{id}": {
+        parameters: [{ $ref: "#/components/parameters/IdPathParam" }],
+        get: {
+          tags: ["Users"],
+          summary: "Get a user by ID",
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        put: {
+          tags: ["Users"],
+          summary: "Update a user",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateUserRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Users"],
+          summary: "Deactivate a user",
+          description:
+            "Soft-deactivates the user and revokes active sessions. It does not hard-delete user history.",
+          responses: {
+            200: { $ref: "#/components/responses/UserManagementSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
       "/api/roles": {
         post: {
           tags: ["Roles"],
@@ -376,6 +471,22 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/UserResponse" },
+            },
+          },
+        },
+        UserManagementSuccess: {
+          description: "User management response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserManagementResponse" },
+            },
+          },
+        },
+        UserManagementListSuccess: {
+          description: "User management list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserManagementListResponse" },
             },
           },
         },
@@ -564,6 +675,53 @@ const options: swaggerJsdoc.Options = {
               format: "password",
               example: "newPassword123",
             },
+          },
+        },
+        CreateUserRequest: {
+          type: "object",
+          required: ["name", "phone", "password"],
+          properties: {
+            name: { type: "string", minLength: 2, example: "Vatsal Shah" },
+            email: {
+              type: "string",
+              format: "email",
+              example: "vatsal@flowoid.com",
+            },
+            phone: { type: "string", minLength: 6, example: "9876543210" },
+            password: {
+              type: "string",
+              minLength: 8,
+              format: "password",
+              example: "password123",
+            },
+            roleId: {
+              type: "string",
+              format: "uuid",
+              description: "Optional. If omitted, the backend uses the active default role.",
+            },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        UpdateUserRequest: {
+          type: "object",
+          properties: {
+            name: { type: "string", minLength: 2, example: "Vatsal Shah" },
+            email: {
+              type: "string",
+              format: "email",
+              nullable: true,
+              example: "vatsal@flowoid.com",
+            },
+            phone: { type: "string", minLength: 6, example: "9876543210" },
+            password: {
+              type: "string",
+              minLength: 8,
+              format: "password",
+              description: "Optional admin password reset. Active sessions are revoked when changed.",
+              example: "newPassword123",
+            },
+            roleId: { type: "string", format: "uuid" },
+            isActive: { type: "boolean", example: true },
           },
         },
         CreateTenantRequest: {
@@ -758,6 +916,84 @@ const options: swaggerJsdoc.Options = {
             phone: { type: "string", example: "9876543210" },
             role: { type: "string", example: "SUPER_ADMIN" },
           },
+        },
+        ManagedUser: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Vatsal Shah" },
+            email: {
+              type: "string",
+              format: "email",
+              example: "vatsal@flowoid.com",
+              nullable: true,
+            },
+            phone: { type: "string", example: "9876543210" },
+            roleId: { type: "string", format: "uuid" },
+            role: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "FREE_USERS" },
+                description: {
+                  type: "string",
+                  nullable: true,
+                  example: "Free plan users",
+                },
+              },
+            },
+            isActive: { type: "boolean", example: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            tenantUsers: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string", format: "uuid" },
+                  isActive: { type: "boolean", example: true },
+                  tenant: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      name: { type: "string", example: "Ayanshi Imitation" },
+                      slug: { type: "string", example: "ayanshi-imitation" },
+                      status: {
+                        type: "string",
+                        enum: ["TRIAL", "ACTIVE", "SUSPENDED", "CANCELLED"],
+                      },
+                    },
+                  },
+                  role: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", format: "uuid" },
+                      name: { type: "string", example: "FREE_USERS" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        UserManagementResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/ManagedUser" },
+          },
+          required: ["success", "data"],
+        },
+        UserManagementListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/ManagedUser" },
+            },
+          },
+          required: ["success", "data"],
         },
         Tenant: {
           type: "object",

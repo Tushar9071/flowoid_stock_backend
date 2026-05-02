@@ -13,6 +13,7 @@ import roleRoutes from "./modules/role/role.routes";
 import permissionRoutes from "./modules/permission/permission.routes";
 import tenantRoutes from "./modules/tenant/tenant.routes";
 import monitoringRoutes from "./modules/monitoring/monitoring.routes";
+import userRoutes from "./modules/user/user.routes";
 
 const app: Application = express();
 
@@ -55,9 +56,9 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 
 // Future protected routes go here:
-// app.use('/api/users', requireAuth, userRoutes);
 app.use("/api/tenants", tenantRoutes);
 app.use("/api/monitoring", monitoringRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
 
