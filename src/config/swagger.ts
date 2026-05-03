@@ -28,6 +28,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
       { name: "Parties", description: "Tenant-scoped party master, opening balance, and statements" },
+      { name: "Raw Materials", description: "Raw material types, purchases, issuances, and stock" },
     ],
     paths: {
       "/health": {
@@ -747,6 +748,292 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/raw-materials/types": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/RawMaterialPageQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialLimitQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialSearchQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialIsActiveQueryParam" },
+        ],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "List raw material types",
+          description: "Returns active material types with computed current stock.",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialTypeListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Raw Materials"],
+          summary: "Create a raw material type",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateRawMaterialTypeRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/RawMaterialTypeSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/raw-materials/types/{materialTypeId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/RawMaterialTypeIdPathParam" },
+        ],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "Get a raw material type",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialTypeSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Raw Materials"],
+          summary: "Update a raw material type",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateRawMaterialTypeRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialTypeSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Raw Materials"],
+          summary: "Deactivate a raw material type",
+          description: "Soft deletes the material type if no stock remains.",
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: {
+              description: "Deletion blocked due to remaining stock",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    remainingStock: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Cannot deactivate material type with remaining stock: 12.5 KG",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/raw-materials/purchases": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/RawMaterialPageQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialLimitQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialMaterialTypeIdQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialSupplierIdQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialPurchaseStatusQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialDateFromQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialDateToQueryParam" },
+        ],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "List raw material purchases",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialPurchaseListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Raw Materials"],
+          summary: "Create a raw material purchase",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateRawMaterialPurchaseRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/RawMaterialPurchaseSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/raw-materials/purchases/{purchaseId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/RawMaterialPurchaseIdPathParam" },
+        ],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "Get a raw material purchase",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialPurchaseSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Raw Materials"],
+          summary: "Update a raw material purchase",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateRawMaterialPurchaseRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialPurchaseSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Raw Materials"],
+          summary: "Delete a raw material purchase",
+          description: "Soft deletes the purchase if it will not reduce stock below zero.",
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: {
+              description: "Deletion blocked due to issued quantities",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    issuedQuantity: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Cannot delete purchase because issued quantity exceeds remaining stock",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/raw-materials/stock": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "Get raw material stock summary",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialStockSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/raw-materials/issuances": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/RawMaterialPageQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialLimitQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialMaterialTypeIdQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialReferenceIdQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialDateFromQueryParam" },
+          { $ref: "#/components/parameters/RawMaterialDateToQueryParam" },
+        ],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "List raw material issuances",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialIssuanceListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Raw Materials"],
+          summary: "Create a raw material issuance",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateRawMaterialIssuanceRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/RawMaterialIssuanceSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/raw-materials/issuances/{issuanceId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/RawMaterialIssuanceIdPathParam" },
+        ],
+        get: {
+          tags: ["Raw Materials"],
+          summary: "Get a raw material issuance",
+          responses: {
+            200: { $ref: "#/components/responses/RawMaterialIssuanceSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
     },
     components: {
       parameters: {
@@ -830,6 +1117,90 @@ const options: swaggerJsdoc.Options = {
           in: "query",
           schema: { type: "boolean", default: true },
           description: "Include or exclude the generated opening balance ledger entry",
+        },
+        RawMaterialTypeIdPathParam: {
+          name: "materialTypeId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Raw material type ID",
+        },
+        RawMaterialPurchaseIdPathParam: {
+          name: "purchaseId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Raw material purchase ID",
+        },
+        RawMaterialIssuanceIdPathParam: {
+          name: "issuanceId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Raw material issuance ID",
+        },
+        RawMaterialPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        RawMaterialLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        RawMaterialSearchQueryParam: {
+          name: "search",
+          in: "query",
+          schema: { type: "string" },
+          description: "Search by material type name",
+        },
+        RawMaterialIsActiveQueryParam: {
+          name: "isActive",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter by active or inactive status",
+        },
+        RawMaterialMaterialTypeIdQueryParam: {
+          name: "materialTypeId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter by material type ID",
+        },
+        RawMaterialSupplierIdQueryParam: {
+          name: "supplierId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter by supplier ID",
+        },
+        RawMaterialPurchaseStatusQueryParam: {
+          name: "status",
+          in: "query",
+          schema: {
+            type: "string",
+            enum: ["PENDING", "RECEIVED", "CANCELLED"],
+          },
+          description: "Filter by purchase status",
+        },
+        RawMaterialDateFromQueryParam: {
+          name: "dateFrom",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include records from this date-time onward",
+        },
+        RawMaterialDateToQueryParam: {
+          name: "dateTo",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include records up to this date-time",
+        },
+        RawMaterialReferenceIdQueryParam: {
+          name: "referenceId",
+          in: "query",
+          schema: { type: "string" },
+          description: "Filter issuances by reference ID",
         },
       },
       responses: {
@@ -975,6 +1346,62 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/PartyStatementResponse" },
+            },
+          },
+        },
+        RawMaterialTypeSuccess: {
+          description: "Raw material type response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialTypeResponse" },
+            },
+          },
+        },
+        RawMaterialTypeListSuccess: {
+          description: "Raw material type list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialTypeListResponse" },
+            },
+          },
+        },
+        RawMaterialPurchaseSuccess: {
+          description: "Raw material purchase response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialPurchaseResponse" },
+            },
+          },
+        },
+        RawMaterialPurchaseListSuccess: {
+          description: "Raw material purchase list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialPurchaseListResponse" },
+            },
+          },
+        },
+        RawMaterialIssuanceSuccess: {
+          description: "Raw material issuance response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialIssuanceResponse" },
+            },
+          },
+        },
+        RawMaterialIssuanceListSuccess: {
+          description: "Raw material issuance list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialIssuanceListResponse" },
+            },
+          },
+        },
+        RawMaterialStockSuccess: {
+          description: "Raw material stock response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RawMaterialStockResponse" },
             },
           },
         },
@@ -1950,6 +2377,243 @@ const options: swaggerJsdoc.Options = {
               },
               required: ["party", "filters", "summary", "entries", "pagination"],
             },
+          },
+        },
+        RawMaterialUnit: {
+          type: "string",
+          enum: ["KG", "GRAM", "PIECE", "METER", "DOZEN"],
+        },
+        RawMaterialPurchaseStatus: {
+          type: "string",
+          enum: ["PENDING", "RECEIVED", "CANCELLED"],
+        },
+        RawMaterialType: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Gold Plated Base" },
+            unit: { $ref: "#/components/schemas/RawMaterialUnit" },
+            description: { type: "string", nullable: true, example: "Base layer" },
+            isActive: { type: "boolean", example: true },
+            deletedAt: { type: "string", format: "date-time", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            currentStock: { type: "string", nullable: true, example: "25.5" },
+          },
+        },
+        RawMaterialPurchase: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            materialTypeId: { type: "string", format: "uuid" },
+            supplierId: { type: "string", format: "uuid" },
+            quantity: { type: "string", example: "100.25" },
+            costPerUnit: { type: "string", example: "12.50" },
+            totalCost: { type: "string", example: "1253.12" },
+            status: { $ref: "#/components/schemas/RawMaterialPurchaseStatus" },
+            purchaseDate: { type: "string", format: "date-time" },
+            invoiceNumber: { type: "string", nullable: true, example: "INV-1024" },
+            notes: { type: "string", nullable: true },
+            deletedAt: { type: "string", format: "date-time", nullable: true },
+            createdById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            materialType: { $ref: "#/components/schemas/RawMaterialType" },
+            supplier: { $ref: "#/components/schemas/Party" },
+          },
+        },
+        RawMaterialIssuance: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            materialTypeId: { type: "string", format: "uuid" },
+            quantity: { type: "string", example: "12.5" },
+            issuedTo: { type: "string", nullable: true, example: "Worker A" },
+            referenceId: { type: "string", nullable: true },
+            referenceType: { type: "string", nullable: true, example: "MANUAL" },
+            issuedAt: { type: "string", format: "date-time" },
+            notes: { type: "string", nullable: true },
+            createdById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            materialType: { $ref: "#/components/schemas/RawMaterialType" },
+          },
+        },
+        RawMaterialStock: {
+          type: "object",
+          properties: {
+            materialTypeId: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Gold Plated Base" },
+            unit: { $ref: "#/components/schemas/RawMaterialUnit" },
+            totalPurchased: { type: "string", example: "120.0" },
+            totalIssued: { type: "string", example: "25.0" },
+            currentStock: { type: "string", example: "95.0" },
+            isLow: { type: "boolean", example: false },
+          },
+        },
+        RawMaterialPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        RawMaterialTypeResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/RawMaterialType" },
+          },
+          required: ["success", "data"],
+        },
+        RawMaterialTypeListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/RawMaterialType" },
+                },
+                pagination: { $ref: "#/components/schemas/RawMaterialPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        RawMaterialPurchaseResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/RawMaterialPurchase" },
+          },
+          required: ["success", "data"],
+        },
+        RawMaterialPurchaseListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/RawMaterialPurchase" },
+                },
+                pagination: { $ref: "#/components/schemas/RawMaterialPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        RawMaterialIssuanceResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/RawMaterialIssuance" },
+          },
+          required: ["success", "data"],
+        },
+        RawMaterialIssuanceListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/RawMaterialIssuance" },
+                },
+                pagination: { $ref: "#/components/schemas/RawMaterialPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        RawMaterialStockResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/RawMaterialStock" },
+            },
+          },
+          required: ["success", "data"],
+        },
+        CreateRawMaterialTypeRequest: {
+          type: "object",
+          required: ["name", "unit"],
+          properties: {
+            name: { type: "string", minLength: 2, example: "Gold Plated Base" },
+            unit: { $ref: "#/components/schemas/RawMaterialUnit" },
+            description: { type: "string", example: "Base layer" },
+          },
+        },
+        UpdateRawMaterialTypeRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            name: { type: "string", minLength: 2, example: "Rhodium Base" },
+            unit: { $ref: "#/components/schemas/RawMaterialUnit" },
+            description: { type: "string", example: "Updated description" },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        CreateRawMaterialPurchaseRequest: {
+          type: "object",
+          required: [
+            "materialTypeId",
+            "supplierId",
+            "quantity",
+            "costPerUnit",
+            "purchaseDate",
+          ],
+          properties: {
+            materialTypeId: { type: "string", format: "uuid" },
+            supplierId: { type: "string", format: "uuid" },
+            quantity: { type: "number", minimum: 0.0001, example: 100.25 },
+            costPerUnit: { type: "number", minimum: 0.01, example: 12.5 },
+            purchaseDate: { type: "string", format: "date-time" },
+            status: { $ref: "#/components/schemas/RawMaterialPurchaseStatus" },
+            invoiceNumber: { type: "string", example: "INV-1024" },
+            notes: { type: "string" },
+          },
+        },
+        UpdateRawMaterialPurchaseRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            quantity: { type: "number", minimum: 0.0001, example: 120.5 },
+            costPerUnit: { type: "number", minimum: 0.01, example: 13.5 },
+            purchaseDate: { type: "string", format: "date-time" },
+            status: { $ref: "#/components/schemas/RawMaterialPurchaseStatus" },
+            invoiceNumber: { type: "string", example: "INV-1024" },
+            notes: { type: "string" },
+          },
+        },
+        CreateRawMaterialIssuanceRequest: {
+          type: "object",
+          required: ["materialTypeId", "quantity"],
+          properties: {
+            materialTypeId: { type: "string", format: "uuid" },
+            quantity: { type: "number", minimum: 0.0001, example: 10.5 },
+            issuedAt: { type: "string", format: "date-time" },
+            issuedTo: { type: "string", example: "Worker A" },
+            notes: { type: "string" },
           },
         },
         Order: {

@@ -8,7 +8,7 @@ import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger";
 import { errorHandler } from "./middleware/error.middleware";
 import { collectApiMetrics } from "./middleware/metrics.middleware";
-
+//all routes import statement here
 import authRoutes from "./modules/auth/auth.routes";
 import roleRoutes from "./modules/role/role.routes";
 import permissionRoutes from "./modules/permission/permission.routes";
@@ -16,6 +16,8 @@ import tenantRoutes from "./modules/tenant/tenant.routes";
 import monitoringRoutes from "./modules/monitoring/monitoring.routes";
 import partiesRoute from "./modules/Parties/Parties.route";
 import userRoutes from "./modules/user/user.routes";
+import rawMaterialRoutes from "./modules/rawMaterial/rawMaterial.routes";
+
 
 
 const app: Application = express();
@@ -64,7 +66,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/tenants/:tenantId/parties", partiesRoute);
-
+app.use("/api/tenants/:tenantId/raw-materials", rawMaterialRoutes);
 
 // Global error handler - always last
 app.use(errorHandler);

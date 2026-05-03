@@ -21,8 +21,10 @@ model User {
   refreshTokens AuthRefreshToken[]
   createdRoles  Role[]             @relation("CreatedRoles")
   tenantUsers   TenantUser[]
-
+  rawMaterialPurchases RawMaterialPurchase[]
+  rawMaterialIssuances RawMaterialIssuance[]
   @@map("users")
+
 }
 
 enum PartyType {
@@ -45,6 +47,20 @@ enum PartyLedgerEntryType {
   DEBIT_NOTE
   ADJUSTMENT
   JOURNAL
+}
+
+enum RawMaterialUnit {
+  KG
+  GRAM
+  PIECE
+  METER
+  DOZEN
+}
+
+enum RawMaterialPurchaseStatus {
+  PENDING    // recorded but not yet received
+  RECEIVED   // material received in stock
+  CANCELLED  // purchase cancelled
 }
 
 enum TenantStatus {
@@ -72,6 +88,9 @@ model Tenant {
   users              TenantUser[]
   parties            Party[]
   partyLedgerEntries PartyLedgerEntry[]
+  rawMaterialTypes     RawMaterialType[]
+  rawMaterialPurchases RawMaterialPurchase[]
+  rawMaterialIssuances RawMaterialIssuance[]
 
   @@map("tenants")
 }
@@ -111,6 +130,78 @@ model Party {
   @@index([tenantId, name])
   @@index([tenantId, phone])
   @@map("parties")
+  rawMaterialPurchases RawMaterialPurchase[]
+}
+
+model RawMaterialType {
+  id          String          @id @default(uuid())
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  name        String
+  unit        RawMaterialUnit
+  description String?
+  isActive    Boolean         @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  purchases  RawMaterialPurchase[]
+  issuances  RawMaterialIssuance[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("raw_material_types")
+}
+
+model RawMaterialPurchase {
+  id             String                    @id @default(uuid())
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId       String
+  materialType   RawMaterialType           @relation(fields: [materialTypeId], references: [id])
+  materialTypeId String
+  supplier       Party                     @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  quantity       Decimal                   @db.Decimal(18, 4)
+  costPerUnit    Decimal                   @db.Decimal(18, 2)
+  totalCost      Decimal                   @db.Decimal(18, 2)
+  status         RawMaterialPurchaseStatus @default(RECEIVED)
+  purchaseDate   DateTime
+  invoiceNumber  String?
+  notes          String?
+  deletedAt      DateTime?
+  createdBy      User                      @relation(fields: [createdById], references: [id])
+  createdById    String
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@index([tenantId, materialTypeId])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, purchaseDate])
+  @@index([tenantId, status])
+  @@map("raw_material_purchases")
+}
+
+model RawMaterialIssuance {
+  id             String          @id @default(uuid())
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId       String
+  materialType   RawMaterialType @relation(fields: [materialTypeId], references: [id])
+  materialTypeId String
+  quantity       Decimal         @db.Decimal(18, 4)
+  issuedTo       String?         // free text or reference — worker name / assignment ref
+  referenceId    String?         // will link to WorkerAssignment id in future
+  referenceType  String?         // e.g. "WORKER_ASSIGNMENT" — for polymorphic future use
+  issuedAt       DateTime        @default(now())
+  notes          String?
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([tenantId, materialTypeId])
+  @@index([tenantId, issuedAt])
+  @@index([tenantId, referenceId])
+  @@map("raw_material_issuances")
 }
 
 model PartyLedgerEntry {
