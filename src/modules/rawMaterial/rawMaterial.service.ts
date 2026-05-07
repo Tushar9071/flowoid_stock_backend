@@ -716,7 +716,6 @@ export const getAllIssuances = async (
 	const where: Prisma.RawMaterialIssuanceWhereInput = {
 		tenantId,
 		materialTypeId: query.materialTypeId,
-		referenceId: query.referenceId,
 	};
 
 	if (query.dateFrom || query.dateTo) {
@@ -783,40 +782,10 @@ export const createIssuance = async (
 	currentUser: CurrentUser,
 ) => {
 	await assertTenantAccess(tenantId, currentUser);
+	void input;
+	void createdById;
 
-	const materialType = await prisma.rawMaterialType.findFirst({
-		where: {
-			id: input.materialTypeId,
-			tenantId,
-			deletedAt: null,
-		},
-		select: { id: true, unit: true },
-	});
-
-	if (!materialType) {
-		throw notFoundError("Material type not found");
-	}
-
-	const currentStock = await getMaterialTypeStock(tenantId, input.materialTypeId);
-	const requestedQuantity = new Prisma.Decimal(input.quantity);
-
-	if (requestedQuantity.gt(currentStock)) {
-		throw validationError(
-			`Insufficient stock. Available: ${currentStock.toString()} ${materialType.unit}`,
-		);
-	}
-
-	return prisma.rawMaterialIssuance.create({
-		data: {
-			tenantId,
-			materialTypeId: input.materialTypeId,
-			quantity: requestedQuantity,
-			issuedTo: normalizeOptionalString(input.issuedTo),
-			issuedAt: input.issuedAt,
-			notes: normalizeOptionalString(input.notes),
-			referenceType: "MANUAL",
-			createdById,
-		},
-		include: ISSUANCE_INCLUDE,
-	});
+	throw validationError(
+		"Manual raw material issuances are no longer supported after the worker-assignment migration. Create issuances through the assignment flow instead.",
+	);
 };

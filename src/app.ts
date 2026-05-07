@@ -17,6 +17,10 @@ import monitoringRoutes from "./modules/monitoring/monitoring.routes";
 import partiesRoute from "./modules/Parties/Parties.route";
 import userRoutes from "./modules/user/user.routes";
 import rawMaterialRoutes from "./modules/rawMaterial/rawMaterial.routes";
+import designsRoutes from "./modules/designs/designs.routes";
+import supplementaryRoutes from "./modules/supplementary/supplementary.routes";
+import workersRoutes from "./modules/workers/workers.routes";
+import assignmentsRoutes from "./modules/assignments/assignments.routes";
 
 
 
@@ -67,6 +71,10 @@ app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/tenants/:tenantId/parties", partiesRoute);
 app.use("/api/tenants/:tenantId/raw-materials", rawMaterialRoutes);
+app.use("/api/tenants/:tenantId/designs", designsRoutes);
+app.use("/api/tenants/:tenantId/supplementary", supplementaryRoutes);
+app.use("/api/tenants/:tenantId/workers", workersRoutes);
+app.use("/api/tenants/:tenantId/assignments", assignmentsRoutes);
 
 // Global error handler - always last
 app.use(errorHandler);

@@ -1,120 +1,130 @@
 # Raw Material Module
 
 ## 1. Overview
-The Raw Material module manages the master catalogue of materials, purchase intake from suppliers, stock issuance to workers, and the resulting stock balance. It fits into the business flow as:
+The Raw Material module manages the master catalogue of materials, purchase intake from suppliers, and stock visibility. Issuances are **now created via the worker-assignment flow**, so manual issuance creation is disabled in this module.
 
-Supplier (Party, type = SUPPLIER) → RawMaterialPurchase → RawMaterialType catalogue → RawMaterialIssuance → Stock summary
+Business flow:
 
-The module is tenant-scoped and enforces access via tenant membership checks.
+Supplier (Party, type = SUPPLIER) → RawMaterialPurchase → RawMaterialType catalogue → RawMaterialIssuance (via assignments) → Stock summary
 
-## 2. Database Models
+All endpoints are tenant-scoped and require authentication.
+
+---
+
+## 2. Authentication & Permissions
+All endpoints require authentication via either:
+- **Cookie**: `accessToken`
+- **Header**: `Authorization: Bearer <accessToken>`
+
+**Permissions** (middleware currently commented out in routes, but expected codes are):
+
+| Permission | Usage |
+| --- | --- |
+| `raw-materials.read` | Read types, purchases, stock, issuances |
+| `raw-materials.create` | Create types, purchases |
+| `raw-materials.update` | Update types, purchases |
+| `raw-materials.delete` | Delete types, purchases |
+
+---
+
+## 3. Core Data Models
 
 ### RawMaterialType
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| id | UUID | Yes | Primary key |
-| tenantId | UUID | Yes | FK → Tenant |
-| name | String | Yes | Unique per tenant (case-insensitive enforced at app layer) |
-| unit | RawMaterialUnit | Yes | KG, GRAM, PIECE, METER, DOZEN |
-| description | String | No | Optional notes |
-| isActive | Boolean | Yes | Defaults true |
-| deletedAt | DateTime | No | Soft delete marker |
-| createdAt | DateTime | Yes | Auto |
-| updatedAt | DateTime | Yes | Auto |
-
-Relationships:
-- Tenant → RawMaterialType (one-to-many)
-- RawMaterialType → RawMaterialPurchase (one-to-many)
-- RawMaterialType → RawMaterialIssuance (one-to-many)
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | UUID | Primary key |
+| tenantId | UUID | FK → Tenant |
+| name | String | Unique per tenant (case-insensitive enforced) |
+| unit | `KG`, `GRAM`, `PIECE`, `METER`, `DOZEN` | Required |
+| description | String | Optional |
+| isActive | Boolean | Defaults true |
+| deletedAt | DateTime | Soft delete marker |
+| createdAt | DateTime | Auto |
+| updatedAt | DateTime | Auto |
+| currentStock | Decimal (string) | Computed in list/get by ID |
 
 ### RawMaterialPurchase
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| id | UUID | Yes | Primary key |
-| tenantId | UUID | Yes | FK → Tenant |
-| materialTypeId | UUID | Yes | FK → RawMaterialType |
-| supplierId | UUID | Yes | FK → Party (type=SUPPLIER required) |
-| quantity | Decimal(18,4) | Yes | Positive quantity |
-| costPerUnit | Decimal(18,2) | Yes | Positive unit cost |
-| totalCost | Decimal(18,2) | Yes | Computed server-side: quantity × costPerUnit |
-| status | RawMaterialPurchaseStatus | Yes | PENDING, RECEIVED, CANCELLED |
-| purchaseDate | DateTime | Yes | Purchase date |
-| invoiceNumber | String | No | Optional |
-| notes | String | No | Optional |
-| deletedAt | DateTime | No | Soft delete marker |
-| createdById | UUID | Yes | FK → User |
-| createdAt | DateTime | Yes | Auto |
-| updatedAt | DateTime | Yes | Auto |
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | UUID | Primary key |
+| tenantId | UUID | FK → Tenant |
+| materialTypeId | UUID | FK → RawMaterialType |
+| supplierId | UUID | FK → Party (must be SUPPLIER) |
+| quantity | Decimal(18,4) | Positive |
+| costPerUnit | Decimal(18,2) | Positive |
+| totalCost | Decimal(18,2) | Computed server-side |
+| status | `PENDING`, `RECEIVED`, `CANCELLED` | Defaults `RECEIVED` |
+| purchaseDate | DateTime | Required |
+| invoiceNumber | String | Optional |
+| notes | String | Optional |
+| deletedAt | DateTime | Soft delete marker |
+| createdById | UUID | FK → User |
+| createdAt | DateTime | Auto |
+| updatedAt | DateTime | Auto |
+| materialType | Object | Included in list/get responses |
+| supplier | Object | Included in list/get responses |
 
-Relationships:
-- Tenant → RawMaterialPurchase (one-to-many)
-- RawMaterialPurchase → RawMaterialType (many-to-one)
-- RawMaterialPurchase → Party (supplier) (many-to-one)
-- RawMaterialPurchase → User (createdBy) (many-to-one)
+### RawMaterialIssuance (read-only in this module)
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | UUID | Primary key |
+| tenantId | UUID | FK → Tenant |
+| materialTypeId | UUID | FK → RawMaterialType |
+| assignmentId | UUID | FK → WorkerAssignment (unique) |
+| quantity | Decimal(18,4) | Positive |
+| issuedAt | DateTime | Defaults now |
+| notes | String | Optional |
+| createdById | UUID | FK → User |
+| createdAt | DateTime | Auto |
+| updatedAt | DateTime | Auto |
+| materialType | Object | Included in list/get responses |
 
-### RawMaterialIssuance
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| id | UUID | Yes | Primary key |
-| tenantId | UUID | Yes | FK → Tenant |
-| materialTypeId | UUID | Yes | FK → RawMaterialType |
-| quantity | Decimal(18,4) | Yes | Positive quantity |
-| issuedTo | String | No | Free text (worker name, etc.) |
-| referenceId | String | No | Soft reference to future assignment |
-| referenceType | String | No | e.g. MANUAL, WORKER_ASSIGNMENT |
-| issuedAt | DateTime | Yes | Defaults now |
-| notes | String | No | Optional |
-| createdById | UUID | Yes | FK → User |
-| createdAt | DateTime | Yes | Auto |
-| updatedAt | DateTime | Yes | Auto |
+> Decimal fields are returned as **strings** in JSON to preserve precision.
 
-Relationships:
-- Tenant → RawMaterialIssuance (one-to-many)
-- RawMaterialIssuance → RawMaterialType (many-to-one)
-- RawMaterialIssuance → User (createdBy) (many-to-one)
+---
 
-## 3. Business Rules
-1. Tenant access is enforced for all operations. Errors:
-   - "Tenant not found"
-   - "You do not have access to this tenant"
-2. RawMaterialType name must be unique per tenant (soft-deleted types are excluded in app checks).
-3. A purchase supplier must be a Party with type = SUPPLIER. Errors:
-   - "Supplier not found"
-   - "Selected party is not a supplier"
-4. totalCost is calculated server-side: quantity × costPerUnit.
-5. Stock = SUM(received purchases) − SUM(issuances).
-6. RawMaterialType and RawMaterialPurchase are soft-deleted (set deletedAt, never hard delete).
-7. Cannot deactivate a material type if current stock > 0:
-   - "Cannot deactivate material type with remaining stock: {value} {unit}"
-8. Cannot delete a purchase if its removal would make stock negative:
-   - "Cannot delete purchase because issued quantity exceeds remaining stock"
-9. Insufficient stock for issuance:
-   - "Insufficient stock. Available: {currentStock} {unit}"
-10. Read endpoints require read permission; writes require create/update; deletes require delete.
-11. Issuances created via this module are MANUAL (referenceType = "MANUAL").
+## 4. Business Rules
+1. Tenant access is enforced for all operations.
+2. RawMaterialType name must be unique per tenant (soft-deleted types excluded).
+3. Purchase supplier must be a Party with type = SUPPLIER.
+4. `totalCost` is computed server-side: `quantity × costPerUnit` (clients must not send it).
+5. Stock is computed dynamically:
 
-## 4. API Reference
+$$
+\text{currentStock} = \sum(\text{purchases.quantity where status=RECEIVED}) - \sum(\text{issuances.quantity})
+$$
+
+6. RawMaterialType and RawMaterialPurchase are soft-deleted (never hard delete).
+7. Cannot deactivate a material type if current stock > 0.
+8. Cannot delete a purchase if removal would make stock negative.
+9. Manual issuance creation is **disabled**. Issuances are created via worker assignments.
+
+---
+
+## 5. API Reference
 
 ### Endpoint Summary
-| Method | Endpoint | Permission |
+| Method | Endpoint | Notes |
 | --- | --- | --- |
-| GET | /api/tenants/:tenantId/raw-materials/types | raw-materials.read |
-| GET | /api/tenants/:tenantId/raw-materials/types/:materialTypeId | raw-materials.read |
-| POST | /api/tenants/:tenantId/raw-materials/types | raw-materials.create |
-| PATCH | /api/tenants/:tenantId/raw-materials/types/:materialTypeId | raw-materials.update |
-| DELETE | /api/tenants/:tenantId/raw-materials/types/:materialTypeId | raw-materials.delete |
-| GET | /api/tenants/:tenantId/raw-materials/purchases | raw-materials.read |
-| GET | /api/tenants/:tenantId/raw-materials/purchases/:purchaseId | raw-materials.read |
-| POST | /api/tenants/:tenantId/raw-materials/purchases | raw-materials.create |
-| PATCH | /api/tenants/:tenantId/raw-materials/purchases/:purchaseId | raw-materials.update |
-| DELETE | /api/tenants/:tenantId/raw-materials/purchases/:purchaseId | raw-materials.delete |
-| GET | /api/tenants/:tenantId/raw-materials/stock | raw-materials.read |
-| GET | /api/tenants/:tenantId/raw-materials/issuances | raw-materials.read |
-| GET | /api/tenants/:tenantId/raw-materials/issuances/:issuanceId | raw-materials.read |
-| POST | /api/tenants/:tenantId/raw-materials/issuances | raw-materials.create |
+| GET | `/api/tenants/:tenantId/raw-materials/types` | List types (with stock) |
+| GET | `/api/tenants/:tenantId/raw-materials/types/:materialTypeId` | Get type by ID |
+| POST | `/api/tenants/:tenantId/raw-materials/types` | Create type |
+| PATCH | `/api/tenants/:tenantId/raw-materials/types/:materialTypeId` | Update type |
+| DELETE | `/api/tenants/:tenantId/raw-materials/types/:materialTypeId` | Soft delete type |
+| GET | `/api/tenants/:tenantId/raw-materials/purchases` | List purchases |
+| GET | `/api/tenants/:tenantId/raw-materials/purchases/:purchaseId` | Get purchase by ID |
+| POST | `/api/tenants/:tenantId/raw-materials/purchases` | Create purchase |
+| PATCH | `/api/tenants/:tenantId/raw-materials/purchases/:purchaseId` | Update purchase |
+| DELETE | `/api/tenants/:tenantId/raw-materials/purchases/:purchaseId` | Soft delete purchase |
+| GET | `/api/tenants/:tenantId/raw-materials/stock` | Stock summary |
+| GET | `/api/tenants/:tenantId/raw-materials/issuances` | List issuances |
+| GET | `/api/tenants/:tenantId/raw-materials/issuances/:issuanceId` | Get issuance by ID |
+| POST | `/api/tenants/:tenantId/raw-materials/issuances` | **Disabled** (use worker assignments) |
 
-### GET /raw-materials/types
-**Query**: page, limit, search, isActive
+---
+
+### GET `/raw-materials/types`
+**Query Params**: `page`, `limit`, `search`, `isActive`
 
 **Response (200)**
 ```json
@@ -122,34 +132,72 @@ Relationships:
   "success": true,
   "data": {
     "items": ["RawMaterialType"],
-    "pagination": { "page": 1, "limit": 20, "totalItems": 1, "totalPages": 1 }
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    }
   }
 }
 ```
 
-### POST /raw-materials/types
+---
+
+### POST `/raw-materials/types`
 **Request**
 ```json
 { "name": "Gold Plated Base", "unit": "KG", "description": "Base layer" }
 ```
-**Response (201)**: RawMaterialType
 
-### PATCH /raw-materials/types/:materialTypeId
+**Response (201)**: `RawMaterialType` (includes `currentStock`)
+
+---
+
+### PATCH `/raw-materials/types/:materialTypeId`
 **Request**
 ```json
 { "name": "Rhodium Base", "isActive": true }
 ```
 
-### DELETE /raw-materials/types/:materialTypeId
+**Response (200)**: `RawMaterialType`
+
+---
+
+### DELETE `/raw-materials/types/:materialTypeId`
 **Response (200)**
 ```json
 { "success": true, "data": { "message": "Material type deleted successfully" } }
 ```
 
-### GET /raw-materials/purchases
-**Query**: page, limit, materialTypeId, supplierId, status, dateFrom, dateTo
+---
 
-### POST /raw-materials/purchases
+### GET `/raw-materials/purchases`
+**Query Params**: `page`, `limit`, `materialTypeId`, `supplierId`, `status`, `dateFrom`, `dateTo`
+
+**Response (200)**
+```json
+{
+  "success": true,
+  "data": {
+    "items": ["RawMaterialPurchase"],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    }
+  }
+}
+```
+
+---
+
+### POST `/raw-materials/purchases`
 **Request**
 ```json
 {
@@ -164,19 +212,32 @@ Relationships:
 }
 ```
 
-### PATCH /raw-materials/purchases/:purchaseId
+**Response (201)**: `RawMaterialPurchase`
+
+> `totalCost` is computed server-side and must not be sent.
+
+---
+
+### PATCH `/raw-materials/purchases/:purchaseId`
 **Request**
 ```json
 { "quantity": 120.5, "costPerUnit": 13.0, "status": "RECEIVED" }
 ```
 
-### DELETE /raw-materials/purchases/:purchaseId
+**Notes**
+- `materialTypeId` and `supplierId` **cannot** be updated.
+
+---
+
+### DELETE `/raw-materials/purchases/:purchaseId`
 **Response (200)**
 ```json
 { "success": true, "data": { "message": "Purchase deleted successfully" } }
 ```
 
-### GET /raw-materials/stock
+---
+
+### GET `/raw-materials/stock`
 **Response (200)**
 ```json
 {
@@ -195,77 +256,65 @@ Relationships:
 }
 ```
 
-### GET /raw-materials/issuances
-**Query**: page, limit, materialTypeId, referenceId, dateFrom, dateTo
+---
 
-### POST /raw-materials/issuances
-**Request**
+### GET `/raw-materials/issuances`
+**Query Params**: `page`, `limit`, `materialTypeId`, `dateFrom`, `dateTo`
+
+**Response (200)**
 ```json
 {
-  "materialTypeId": "uuid",
-  "quantity": 10.5,
-  "issuedAt": "2026-05-03T12:00:00.000Z",
-  "issuedTo": "Worker A",
-  "notes": "Manual issue"
+  "success": true,
+  "data": {
+    "items": ["RawMaterialIssuance"],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    }
+  }
 }
 ```
 
-### GET /raw-materials/issuances/:issuanceId
-**Response (200)**: RawMaterialIssuance
+---
 
-## 5. Stock Calculation
-Stock is computed dynamically:
+### GET `/raw-materials/issuances/:issuanceId`
+**Response (200)**: `RawMaterialIssuance`
 
-$$
-\text{currentStock} = \sum(\text{purchases.quantity where status=RECEIVED}) - \sum(\text{issuances.quantity})
-$$
+---
 
-It is not stored as a column to avoid drift and because purchases/issuances can be updated or soft-deleted.
+### POST `/raw-materials/issuances`
+**Status**: **Disabled**
 
-Only purchases with status = RECEIVED are counted toward stock.
+**Response (400)**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Manual raw material issuances are no longer supported after the worker-assignment migration. Create issuances through the assignment flow instead.",
+    "details": null
+  }
+}
+```
 
-## 6. Issuances
-Issuances are currently manual and not linked to worker assignments.
+---
 
-- referenceType is set to "MANUAL" for all API-created issuances.
-- referenceId remains null until the WorkerAssignment module is added.
-
-## 7. Soft Delete Behaviour
-- RawMaterialType: soft deleted by setting deletedAt and isActive=false.
-- RawMaterialPurchase: soft deleted by setting deletedAt.
-- RawMaterialIssuance: not soft deleted in current module.
-
-Deletion is blocked when:
-- A material type still has remaining stock.
-- A purchase’s removal would make stock go negative.
-
-## 8. Usage Examples
-
-### Setup + first purchase
-1. Create a material type
-2. Create a supplier (Party, type=SUPPLIER)
-3. Create a purchase referencing that supplier and type
-
-### Checking stock
-1. Call GET /raw-materials/stock
-2. Verify currentStock for each type
-
-### Manual issuance
-1. Call POST /raw-materials/issuances with quantity and issuedTo
-2. Verify stock decreases
-
-## 9. Error Reference
-| Error Message | Cause |
-| --- | --- |
-| Tenant not found | Invalid tenantId path param |
-| You do not have access to this tenant | User not a member of tenant |
-| Material type not found | Type ID invalid or deleted |
-| Material type with this name already exists | Duplicate name within tenant |
-| Supplier not found | supplierId invalid or deleted |
-| Selected party is not a supplier | supplierId points to non-supplier party |
-| Cannot deactivate material type with remaining stock: {value} {unit} | Attempt to delete type with stock > 0 |
-| Purchase not found | Purchase ID invalid or deleted |
-| Cannot delete purchase because issued quantity exceeds remaining stock | Issuances would make stock negative |
-| Issuance not found | Issuance ID invalid |
-| Insufficient stock. Available: {currentStock} {unit} | Issuance quantity exceeds available stock |
-| Request validation failed | Input schema validation error (details in response) |
+## 6. Error Response Format
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": {
+      "fieldErrors": {
+        "name": ["Material type name must be at least 2 characters"]
+      }
+    }
+  }
+}
+```

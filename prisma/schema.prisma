@@ -23,6 +23,12 @@ model User {
   tenantUsers   TenantUser[]
   rawMaterialPurchases RawMaterialPurchase[]
   rawMaterialIssuances RawMaterialIssuance[]
+    // Add to User relations:
+  createdDesigns              Design[]
+  createdAssignments          WorkerAssignment[]
+  createdGoodsReturns         GoodsReturn[]
+  recordedWorkerPayments      WorkerPayment[]
+  createdSupplementaryIssuances SupplementaryIssuance[]
   @@map("users")
 
 }
@@ -70,6 +76,20 @@ enum TenantStatus {
   CANCELLED
 }
 
+enum AssignmentStatus {
+  ISSUED             // raw material given, work not started
+  IN_PROGRESS        // worker has started
+  PARTIALLY_RETURNED // some pieces returned, more pending
+  COMPLETED          // all expected pieces returned
+  CLOSED             // manually closed by manager (worker inactive, dispute etc.)
+}
+
+enum WorkerPaymentType {
+  EARNING_SETTLEMENT  // paying earned amount
+  ADVANCE             // advance before work completion
+  ADVANCE_RECOVERY    // deducting previously given advance
+}
+
 model Tenant {
   id                 String       @id @default(uuid())
   name               String
@@ -91,6 +111,14 @@ model Tenant {
   rawMaterialTypes     RawMaterialType[]
   rawMaterialPurchases RawMaterialPurchase[]
   rawMaterialIssuances RawMaterialIssuance[]
+  workers                    Worker[]
+  designs                    Design[]
+  designCategories           DesignCategory[]
+  supplementaryMaterialTypes SupplementaryMaterialType[]
+  supplementaryIssuances     SupplementaryIssuance[]
+  workerAssignments          WorkerAssignment[]
+  goodsReturns               GoodsReturn[]
+  workerPayments             WorkerPayment[]
 
   @@map("tenants")
 }
@@ -147,10 +175,12 @@ model RawMaterialType {
 
   purchases  RawMaterialPurchase[]
   issuances  RawMaterialIssuance[]
+  assignments  WorkerAssignment[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
   @@map("raw_material_types")
+
 }
 
 model RawMaterialPurchase {
@@ -182,25 +212,26 @@ model RawMaterialPurchase {
 }
 
 model RawMaterialIssuance {
-  id             String          @id @default(uuid())
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id             String           @id @default(uuid())
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tenantId       String
-  materialType   RawMaterialType @relation(fields: [materialTypeId], references: [id])
+  materialType   RawMaterialType  @relation(fields: [materialTypeId], references: [id])
   materialTypeId String
-  quantity       Decimal         @db.Decimal(18, 4)
-  issuedTo       String?         // free text or reference — worker name / assignment ref
-  referenceId    String?         // will link to WorkerAssignment id in future
-  referenceType  String?         // e.g. "WORKER_ASSIGNMENT" — for polymorphic future use
-  issuedAt       DateTime        @default(now())
+
+  // Real FK now — replaces the old referenceId/referenceType soft ref
+  assignment     WorkerAssignment @relation(fields: [assignmentId], references: [id])
+  assignmentId   String           @unique  // one issuance per assignment
+
+  quantity       Decimal          @db.Decimal(18, 4)
+  issuedAt       DateTime         @default(now())
   notes          String?
-  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdBy      User             @relation(fields: [createdById], references: [id])
   createdById    String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([tenantId, materialTypeId])
   @@index([tenantId, issuedAt])
-  @@index([tenantId, referenceId])
   @@map("raw_material_issuances")
 }
 
@@ -309,4 +340,304 @@ model AuthRefreshToken {
   @@index([sessionId])
   @@index([expiresAt])
   @@map("auth_refresh_tokens")
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKER MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Worker {
+  id            String   @id @default(uuid())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId      String
+
+  // Identity
+  name          String
+  phone         String?
+  alternatePhone String?
+  address       String?
+  city          String?
+
+  // ID proof — important for real-world verification
+  idProofType   String?  // "Aadhar", "PAN", "Voter ID", "Driving Licence"
+  idProofNumber String?
+
+  // Business fields
+  // Worker earns per piece — but rate comes from the design on each assignment
+  // Opening balance for onboarding workers who already have dues
+  openingBalance        Decimal  @default(0) @db.Decimal(18, 2)
+  // PAYABLE = we owe the worker, RECEIVABLE = worker owes us (advance given)
+  openingBalanceType    String   @default("PAYABLE")
+  openingBalanceDate    DateTime?
+
+  notes         String?
+  isActive      Boolean  @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  assignments    WorkerAssignment[]
+  payments       WorkerPayment[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+  @@map("workers")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DESIGN CATALOGUE
+// Master list of jewellery designs. Core reference for assignments and orders.
+// Diamond count drives the piece rate.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DesignStatus {
+  ACTIVE
+  DISCONTINUED  // no new assignments, existing ones continue
+  DRAFT         // being created, not yet ready for assignment
+}
+
+model DesignCategory {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String
+  name      String                // "Necklace", "Earring", "Bracelet", "Ring"
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  designs   Design[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("design_categories")
+}
+
+model Design {
+  id                  String         @id @default(uuid())
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId            String
+  category            DesignCategory @relation(fields: [categoryId], references: [id])
+  categoryId          String
+
+  designCode          String         // e.g. "AY-NK-001" — unique per tenant
+  name                String
+  description         String?
+
+  // Material & finish
+  material            String?        // "Gold Plated", "Silver Plated", "Rhodium"
+  finish              String?        // "Matte", "Glossy", "Antique"
+
+  // The key business field — drives worker piece rate
+  diamondCount        Int            @default(0)
+
+  // Worker piece rate — set by owner, can be manually overridden
+  // Rate is LOCKED onto the assignment at time of creation
+  // so future changes don't affect historical calculations
+  pieceRateRs         Decimal        @db.Decimal(10, 2)
+
+  // Wholesale pricing
+  salePricePerDozen   Decimal        @db.Decimal(10, 2)
+
+  // Reference image — owner can upload photo of design
+  imageUrl            String?
+
+  status              DesignStatus   @default(ACTIVE)
+  deletedAt           DateTime?
+  notes               String?
+
+  createdBy           User           @relation(fields: [createdById], references: [id])
+  createdById         String
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relations
+  assignments         WorkerAssignment[]
+  supplementaryNeeds  DesignSupplementaryNeed[]  // what supplementary materials this design needs
+
+  @@unique([tenantId, designCode])
+  @@index([tenantId, status])
+  @@index([tenantId, categoryId])
+  @@map("designs")
+}
+
+// Template — which supplementary materials a design typically needs
+// When an assignment is created for this design, this acts as a checklist
+// Manager can override quantities per assignment
+model DesignSupplementaryNeed {
+  id             String                    @id @default(uuid())
+  design         Design                    @relation(fields: [designId], references: [id], onDelete: Cascade)
+  designId       String
+  materialType   SupplementaryMaterialType @relation(fields: [materialTypeId], references: [id])
+  materialTypeId String
+  quantityPerPiece Decimal                 @db.Decimal(10, 4) // how much per piece expected
+  notes          String?
+
+  @@unique([designId, materialTypeId])
+  @@map("design_supplementary_needs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPPLEMENTARY MATERIALS
+// Items issued to workers alongside raw material:
+// stones, diamonds, fittings, threads, coatings, etc.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SupplementaryMaterialType {
+  id            String   @id @default(uuid())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId      String
+  name          String                 // "White Round Stones 3mm", "Golden Hook Fittings"
+  unit          String                 // "pieces", "grams", "ml" — flexible
+  description   String?
+  stockQuantity Decimal  @default(0) @db.Decimal(18, 4)
+  isActive      Boolean  @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  issuances           SupplementaryIssuance[]
+  designNeeds         DesignSupplementaryNeed[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("supplementary_material_types")
+}
+
+model SupplementaryIssuance {
+  id             String                    @id @default(uuid())
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId       String
+  assignment     WorkerAssignment          @relation(fields: [assignmentId], references: [id])
+  assignmentId   String
+  materialType   SupplementaryMaterialType @relation(fields: [materialTypeId], references: [id])
+  materialTypeId String
+  quantity       Decimal                   @db.Decimal(18, 4)
+  notes          String?
+  createdBy      User                      @relation(fields: [createdById], references: [id])
+  createdById    String
+  issuedAt       DateTime                  @default(now())
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@index([tenantId, assignmentId])
+  @@index([tenantId, materialTypeId])
+  @@map("supplementary_issuances")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WORKER ASSIGNMENTS
+// Core of the manufacturing flow.
+// One assignment = one worker + one design + one raw material lot.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WorkerAssignment {
+  id                    String           @id @default(uuid())
+  tenant                Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId              String
+  worker                Worker           @relation(fields: [workerId], references: [id])
+  workerId              String
+  design                Design           @relation(fields: [designId], references: [id])
+  designId              String
+
+  // Raw material issued for this assignment
+  rawMaterialType       RawMaterialType  @relation(fields: [rawMaterialTypeId], references: [id])
+  rawMaterialTypeId     String
+  rawMaterialQty        Decimal          @db.Decimal(18, 4)
+
+  // Piece tracking
+  expectedPieces        Int              // owner's expectation based on raw material qty
+  returnedPieces        Int      @default(0)  // total accepted pieces received so far
+  rejectedPieces        Int      @default(0)  // total rejected pieces so far
+
+  // Rate LOCKED at time of assignment — critical for historical accuracy
+  // If design's pieceRateRs changes tomorrow, old assignments are unaffected
+  pieceRateAtAssignment Decimal          @db.Decimal(10, 2)
+
+  // Total earned so far = returnedPieces × pieceRateAtAssignment
+  // Stored as running total, updated on each GoodsReturn
+  totalEarned           Decimal  @default(0) @db.Decimal(12, 2)
+
+  status                AssignmentStatus @default(ISSUED)
+  issuedAt              DateTime         @default(now())
+  expectedReturnDate    DateTime?
+  completedAt           DateTime?
+  notes                 String?
+
+  createdBy             User             @relation(fields: [createdById], references: [id])
+  createdById           String
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  // Relations
+  goodsReturns           GoodsReturn[]
+  supplementaryIssuances SupplementaryIssuance[]
+  rawMaterialIssuance    RawMaterialIssuance?    // one issuance created automatically
+
+  @@index([tenantId, workerId])
+  @@index([tenantId, designId])
+  @@index([tenantId, status])
+  @@index([tenantId, issuedAt])
+  @@map("worker_assignments")
+}
+
+// Each time a worker returns a batch of finished pieces
+// Supports partial returns — worker can return in multiple batches
+model GoodsReturn {
+  id              String           @id @default(uuid())
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId        String
+  assignment      WorkerAssignment @relation(fields: [assignmentId], references: [id])
+  assignmentId    String
+
+  // Pieces in THIS batch
+  piecesReturned  Int
+  rejectedPieces  Int      @default(0)
+  acceptedPieces  Int                    // = piecesReturned - rejectedPieces
+
+  // Earning for THIS batch = acceptedPieces × assignment.pieceRateAtAssignment
+  earningAmount   Decimal          @db.Decimal(12, 2)
+
+  returnedAt      DateTime         @default(now())
+  // Rejection reason — important for quality tracking
+  rejectionNotes  String?
+  notes           String?
+
+  createdBy       User             @relation(fields: [createdById], references: [id])
+  createdById     String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([tenantId, assignmentId])
+  @@index([tenantId, returnedAt])
+  @@map("goods_returns")
+}
+// Money paid to workers
+// Separate from GoodsReturn because payment timing differs from goods collection
+model WorkerPayment {
+  id          String            @id @default(uuid())
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  worker      Worker            @relation(fields: [workerId], references: [id])
+  workerId    String
+
+  amount      Decimal           @db.Decimal(12, 2)
+  paymentType WorkerPaymentType
+  // CASH only for now, extensible for future
+  paymentMode String            @default("CASH")
+
+  paidAt      DateTime          @default(now())
+  notes       String?
+
+  recordedBy  User              @relation(fields: [recordedById], references: [id])
+  recordedById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([tenantId, workerId])
+  @@index([tenantId, paidAt])
+  @@map("worker_payments")
 }

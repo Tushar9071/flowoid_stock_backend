@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken';
 import { unauthorizedError } from '../common/errors/app-error';
 import { ACCESS_TOKEN_SECRET } from '../config/auth';
 import type { AuthenticatedRequest, JwtPayload } from '../types/auth.types';
-import { log } from 'console';
 
 /**
  * Middleware that validates a Bearer token from the Authorization header.

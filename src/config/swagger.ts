@@ -29,6 +29,12 @@ const options: swaggerJsdoc.Options = {
       { name: "Permissions", description: "Permission management" },
       { name: "Parties", description: "Tenant-scoped party master, opening balance, and statements" },
       { name: "Raw Materials", description: "Raw material types, purchases, issuances, and stock" },
+      { name: "Design Categories", description: "Tenant-scoped design category master data" },
+      { name: "Designs", description: "Jewellery design catalogue and design supplementary templates" },
+      { name: "Supplementary Materials", description: "Tenant-scoped supplementary material master data and manual stock adjustments" },
+      { name: "Workers", description: "Tenant-scoped worker profiles, summaries, assignments, payments, and ledger views" },
+      { name: "Assignments", description: "Worker assignments with automatic raw material and supplementary issuances" },
+      { name: "Goods Returns", description: "Batch returns of finished goods against worker assignments" },
     ],
     paths: {
       "/health": {
@@ -1034,6 +1040,1213 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/designs/categories": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+        ],
+        get: {
+          tags: ["Design Categories"],
+          summary: "List design categories",
+          description:
+            "Returns tenant-scoped design categories ordered by sort order and name, with a count of non-deleted designs in each category.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/DesignPageQueryParam" },
+            { $ref: "#/components/parameters/DesignLimitQueryParam" },
+            { $ref: "#/components/parameters/DesignCategoryIsActiveQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/DesignCategoryListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Design Categories"],
+          summary: "Create a design category",
+          description:
+            "Creates a tenant-scoped category such as Necklace, Earring, Bracelet, or Ring.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateDesignCategoryRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/DesignCategorySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/designs/categories/{id}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/DesignCategoryIdPathParam" },
+        ],
+        get: {
+          tags: ["Design Categories"],
+          summary: "Get a design category by ID",
+          description:
+            "Returns one tenant-scoped design category with the count of non-deleted designs linked to it.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/DesignCategorySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Design Categories"],
+          summary: "Update a design category",
+          description:
+            "Updates category name, sort order, or active status for a tenant-scoped design category.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateDesignCategoryRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/DesignCategorySuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Design Categories"],
+          summary: "Deactivate a design category",
+          description:
+            "Marks the category inactive. Deletion is blocked while non-deleted designs still reference it.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: {
+              description: "Category deletion blocked due to linked designs",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    existingDesigns: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Cannot delete category with existing designs. Move designs first.",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/designs": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Designs"],
+          summary: "List designs",
+          description:
+            "Returns tenant-scoped designs filtered by category, status, and free-text search across design code and name.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/DesignPageQueryParam" },
+            { $ref: "#/components/parameters/DesignLimitQueryParam" },
+            { $ref: "#/components/parameters/DesignCategoryIdQueryParam" },
+            { $ref: "#/components/parameters/DesignStatusQueryParam" },
+            { $ref: "#/components/parameters/DesignSearchQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/DesignListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Designs"],
+          summary: "Create a design",
+          description:
+            "Creates a tenant-scoped design catalogue record with piece rate, diamond count, sale price, and lifecycle status.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateDesignRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/DesignSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/designs/{id}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/DesignIdPathParam" },
+        ],
+        get: {
+          tags: ["Designs"],
+          summary: "Get a design by ID",
+          description:
+            "Returns one non-deleted design with its category and supplementary material template rows.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/DesignSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Designs"],
+          summary: "Update a design",
+          description:
+            "Updates design details, pricing, lifecycle status, category, or media URL for a non-deleted design.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateDesignRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/DesignSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Designs"],
+          summary: "Soft delete a design",
+          description:
+            "Marks the design deleted. Deletion is blocked while any assignment is still open, issued, in progress, or partially returned.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: {
+              description: "Design deletion blocked due to active assignments",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    activeAssignments: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Cannot delete design with active assignments",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/designs/{id}/status": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/DesignIdPathParam" },
+        ],
+        patch: {
+          tags: ["Designs"],
+          summary: "Update design status",
+          description:
+            "Changes the lifecycle status of a design. Discontinuation is blocked while issued or in-progress assignments exist.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateDesignStatusRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/DesignSuccess" },
+            400: {
+              description: "Status update blocked due to active assignments",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    activeAssignments: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Cannot discontinue design with active assignments",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/designs/{id}/supplementary-needs": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/DesignIdPathParam" },
+        ],
+        get: {
+          tags: ["Designs"],
+          summary: "List supplementary needs for a design",
+          description:
+            "Returns the per-piece supplementary material template rows configured for a design.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/DesignSupplementaryNeedListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Designs"],
+          summary: "Add a supplementary need to a design",
+          description:
+            "Adds one material template row to a design, defining how much of a supplementary material is typically needed per finished piece.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateDesignSupplementaryNeedRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/DesignSupplementaryNeedSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/designs/{id}/supplementary-needs/{needId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/DesignIdPathParam" },
+          { $ref: "#/components/parameters/DesignNeedIdPathParam" },
+        ],
+        patch: {
+          tags: ["Designs"],
+          summary: "Update a design supplementary need",
+          description:
+            "Updates quantity per piece or notes for a design's supplementary material template row.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateDesignSupplementaryNeedRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/DesignSupplementaryNeedSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Designs"],
+          summary: "Remove a design supplementary need",
+          description: "Hard deletes a supplementary material template row from the design.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/supplementary": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Supplementary Materials"],
+          summary: "List supplementary material types",
+          description:
+            "Returns tenant-scoped supplementary materials filtered by active status and free-text name search.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/SupplementaryPageQueryParam" },
+            { $ref: "#/components/parameters/SupplementaryLimitQueryParam" },
+            { $ref: "#/components/parameters/SupplementarySearchQueryParam" },
+            { $ref: "#/components/parameters/SupplementaryIsActiveQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/SupplementaryMaterialTypeListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Supplementary Materials"],
+          summary: "Create a supplementary material type",
+          description:
+            "Creates a tenant-scoped supplementary material such as stones, fittings, threads, or coatings, with manually tracked stock.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateSupplementaryMaterialTypeRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/SupplementaryMaterialTypeSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/supplementary/{id}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/SupplementaryMaterialTypeIdPathParam" },
+        ],
+        get: {
+          tags: ["Supplementary Materials"],
+          summary: "Get a supplementary material type by ID",
+          description: "Returns one non-deleted supplementary material type.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/SupplementaryMaterialTypeSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Supplementary Materials"],
+          summary: "Update a supplementary material type",
+          description:
+            "Updates the name, unit, description, or active status of a supplementary material type.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateSupplementaryMaterialTypeRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/SupplementaryMaterialTypeSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Supplementary Materials"],
+          summary: "Soft delete a supplementary material type",
+          description:
+            "Marks the supplementary material inactive and deleted. Deletion is blocked while stock remains or the material is referenced by any design template.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: {
+              description: "Deletion blocked due to remaining stock or design references",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    remainingStock: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Cannot delete supplementary material with remaining stock: 12.5000 pieces",
+                          details: null,
+                        },
+                      },
+                    },
+                    designReferences: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Cannot delete supplementary material referenced by 2 design(s)",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/supplementary/{id}/stock": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/SupplementaryMaterialTypeIdPathParam" },
+        ],
+        patch: {
+          tags: ["Supplementary Materials"],
+          summary: "Adjust supplementary material stock",
+          description:
+            "Manually increases or decreases stockQuantity for a supplementary material. Positive adjustments add stock and negative adjustments deduct stock.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AdjustSupplementaryStockRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/SupplementaryMaterialTypeSuccess" },
+            400: {
+              description: "Stock adjustment would make inventory negative",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    negativeStock: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Adjustment would result in negative stock. Current stock: 4.0000 pieces",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Workers"],
+          summary: "List workers",
+          description:
+            "Returns tenant-scoped workers filtered by active status, search text, and city, along with the count of active assignments for each worker.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/WorkerPageQueryParam" },
+            { $ref: "#/components/parameters/WorkerLimitQueryParam" },
+            { $ref: "#/components/parameters/WorkerIsActiveQueryParam" },
+            { $ref: "#/components/parameters/WorkerSearchQueryParam" },
+            { $ref: "#/components/parameters/WorkerCityQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Workers"],
+          summary: "Create a worker",
+          description:
+            "Creates a worker profile including onboarding balance details for existing dues or advances.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateWorkerRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/WorkerSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers/payments": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Workers"],
+          summary: "List worker payments across the tenant",
+          description:
+            "Returns worker payment records filtered by worker, payment type, and paid date range. Payment types are EARNING_SETTLEMENT for settling completed work, ADVANCE for early payout before work completion, and ADVANCE_RECOVERY for recovering a previously given advance from worker earnings.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/WorkerPaymentWorkerIdQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentTypeQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentDateFromQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentDateToQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentPageQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentLimitQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerPaymentListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Workers"],
+          summary: "Record a worker payment",
+          description:
+            "Records a worker payment for an active worker. EARNING_SETTLEMENT pays completed earnings and cannot exceed the current outstanding balance. ADVANCE records an early payout before work completion. ADVANCE_RECOVERY records recovery of a prior advance from worker earnings and cannot exceed unrecovered advances. When paymentMode is omitted, it defaults to CASH.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateWorkerPaymentRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/CreateWorkerPaymentSuccess" },
+            400: {
+              description:
+                "Worker payment blocked due to outstanding balance or unrecovered advance validation",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    outstandingExceeded: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Payment amount exceeds outstanding balance. Outstanding: 1500.00",
+                          details: null,
+                        },
+                      },
+                    },
+                    advanceRecoveryExceeded: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Recovery amount exceeds total advance given. Total advance: 500.00",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers/payments/{paymentId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/WorkerPaymentIdPathParam" },
+        ],
+        get: {
+          tags: ["Workers"],
+          summary: "Get a worker payment by ID",
+          description:
+            "Returns one worker payment with worker details and the user who recorded it.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerPaymentSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers/{id}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/WorkerIdPathParam" },
+        ],
+        get: {
+          tags: ["Workers"],
+          summary: "Get a worker by ID",
+          description:
+            "Returns one worker profile together with calculated summary fields such as total earned, total paid, outstanding balance, delivered pieces, and active assignments.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerDetailSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Workers"],
+          summary: "Update a worker",
+          description:
+            "Updates worker profile details, onboarding balance information, and notes.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateWorkerRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/WorkerSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Workers"],
+          summary: "Soft delete a worker",
+          description:
+            "Marks the worker inactive and deleted. Deletion is blocked while the worker still has active assignments.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/MessageSuccess" },
+            400: {
+              description: "Worker deletion blocked due to active assignments",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    activeAssignments: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Cannot delete worker with active assignments. Complete or close assignments first.",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers/{id}/assignments": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/WorkerIdPathParam" },
+        ],
+        get: {
+          tags: ["Workers"],
+          summary: "List assignments for a worker",
+          description:
+            "Returns assignments for one worker, optionally filtered by assignment status, including design and raw material details.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/WorkerAssignmentStatusQueryParam" },
+            { $ref: "#/components/parameters/WorkerAssignmentPageQueryParam" },
+            { $ref: "#/components/parameters/WorkerAssignmentLimitQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerAssignmentListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers/{id}/payments": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/WorkerIdPathParam" },
+        ],
+        get: {
+          tags: ["Workers"],
+          summary: "List payments for a worker",
+          description:
+            "Returns worker payment records filtered by payment type and payment date range.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/WorkerPaymentTypeQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentDateFromQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentDateToQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentPageQueryParam" },
+            { $ref: "#/components/parameters/WorkerPaymentLimitQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerPaymentListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/workers/{id}/ledger": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/WorkerIdPathParam" },
+        ],
+        get: {
+          tags: ["Workers"],
+          summary: "Get worker ledger",
+          description:
+            "Returns a chronological worker ledger built from opening balance, goods return earnings, and worker payment entries, with running balance after each row.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerLedgerSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Assignments"],
+          summary: "List worker assignments",
+          description:
+            "Returns assignments filtered by worker, design, status, and issued date range.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/AssignmentPageQueryParam" },
+            { $ref: "#/components/parameters/AssignmentLimitQueryParam" },
+            { $ref: "#/components/parameters/AssignmentWorkerIdQueryParam" },
+            { $ref: "#/components/parameters/AssignmentDesignIdQueryParam" },
+            { $ref: "#/components/parameters/AssignmentStatusQueryParam" },
+            { $ref: "#/components/parameters/AssignmentDateFromQueryParam" },
+            { $ref: "#/components/parameters/AssignmentDateToQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerAssignmentListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        post: {
+          tags: ["Assignments"],
+          summary: "Create a worker assignment",
+          description:
+            "Creates a worker assignment atomically. Supplementary issuances are calculated automatically from the design's supplementary template and deducted from supplementary stock inside the same transaction.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateAssignmentRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/WorkerAssignmentSuccess" },
+            400: {
+              description: "Assignment creation blocked due to stock validation or invalid state",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    insufficientRawMaterial: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Insufficient raw material stock. Available: 12.5000 KG, Requested: 15 KG",
+                          details: null,
+                        },
+                      },
+                    },
+                    insufficientSupplementary: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Insufficient stock for White Round Stones 3mm. Available: 100.0000 pieces, Required: 120.0000 pieces",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments/goods-returns": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Goods Returns"],
+          summary: "List goods returns",
+          description:
+            "Returns goods return batches across assignments, optionally filtered by assignment, worker, and return date range.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/GoodsReturnPageQueryParam" },
+            { $ref: "#/components/parameters/GoodsReturnLimitQueryParam" },
+            { $ref: "#/components/parameters/GoodsReturnAssignmentIdQueryParam" },
+            { $ref: "#/components/parameters/GoodsReturnWorkerIdQueryParam" },
+            { $ref: "#/components/parameters/GoodsReturnDateFromQueryParam" },
+            { $ref: "#/components/parameters/GoodsReturnDateToQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/GoodsReturnListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments/goods-returns/{returnId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/GoodsReturnIdPathParam" },
+        ],
+        get: {
+          tags: ["Goods Returns"],
+          summary: "Get a goods return by ID",
+          description:
+            "Returns a single goods return record with assignment, worker, and design context.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/GoodsReturnSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments/{id}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/AssignmentIdPathParam" },
+        ],
+        get: {
+          tags: ["Assignments"],
+          summary: "Get an assignment by ID",
+          description:
+            "Returns one assignment with worker, design, raw material issuance, supplementary issuances, and chronological goods returns.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/WorkerAssignmentSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Assignments"],
+          summary: "Update assignment notes or expected return date",
+          description:
+            "Updates only the expected return date or notes for a non-terminal assignment.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateAssignmentRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/WorkerAssignmentSuccess" },
+            400: {
+              description: "Assignment update blocked due to terminal status",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    terminalAssignment: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Cannot update a completed or closed assignment",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments/{id}/status": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/AssignmentIdPathParam" },
+        ],
+        patch: {
+          tags: ["Assignments"],
+          summary: "Mark an assignment as in progress",
+          description:
+            "Manual status transition from ISSUED to IN_PROGRESS. All other assignment status transitions happen automatically or through the close endpoint.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateAssignmentStatusRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/WorkerAssignmentSuccess" },
+            400: {
+              description: "Invalid assignment status transition",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    invalidStatusTransition: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message:
+                            "Assignment must be in ISSUED status to mark as in progress",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments/{id}/close": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/AssignmentIdPathParam" },
+        ],
+        patch: {
+          tags: ["Assignments"],
+          summary: "Force close an assignment",
+          description:
+            "Closes a non-terminal assignment and requires a reason in notes. Completed and closed assignments cannot be closed again.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CloseAssignmentRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/WorkerAssignmentSuccess" },
+            400: {
+              description: "Assignment is already terminal or notes are missing",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    alreadyTerminal: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Assignment is already completed or closed",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/assignments/{id}/returns": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/AssignmentIdPathParam" },
+        ],
+        post: {
+          tags: ["Goods Returns"],
+          summary: "Record a goods return batch",
+          description:
+            "Records a goods return in a transaction, updates earned amount and returned piece counts, and automatically moves the assignment to PARTIALLY_RETURNED or COMPLETED based on cumulative accepted pieces.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateGoodsReturnRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/GoodsReturnRecordSuccess" },
+            400: {
+              description:
+                "Goods return blocked due to validation or terminal assignment status",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    missingRejectionNotes: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Request validation failed",
+                          details: {
+                            fieldErrors: {
+                              rejectionNotes: [
+                                "Rejection notes are required when rejected pieces are greater than 0",
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    },
+                    terminalAssignment: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Cannot record return for a completed or closed assignment",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        get: {
+          tags: ["Goods Returns"],
+          summary: "List goods returns for one assignment",
+          description:
+            "Returns chronological goods return batches for a single assignment. Useful for batch-by-batch production tracking.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: "#/components/parameters/GoodsReturnDateFromQueryParam" },
+            { $ref: "#/components/parameters/GoodsReturnDateToQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/AssignmentGoodsReturnListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
     },
     components: {
       parameters: {
@@ -1201,6 +2414,284 @@ const options: swaggerJsdoc.Options = {
           in: "query",
           schema: { type: "string" },
           description: "Filter issuances by reference ID",
+        },
+        DesignCategoryIdPathParam: {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Design category ID",
+        },
+        DesignIdPathParam: {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Design ID",
+        },
+        DesignNeedIdPathParam: {
+          name: "needId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Design supplementary need ID",
+        },
+        SupplementaryMaterialTypeIdPathParam: {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Supplementary material type ID",
+        },
+        DesignPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        DesignLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        DesignSearchQueryParam: {
+          name: "search",
+          in: "query",
+          schema: { type: "string" },
+          description: "Search by design code or design name",
+        },
+        DesignCategoryIsActiveQueryParam: {
+          name: "isActive",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter categories by active or inactive status",
+        },
+        DesignCategoryIdQueryParam: {
+          name: "categoryId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter designs by category ID",
+        },
+        DesignStatusQueryParam: {
+          name: "status",
+          in: "query",
+          schema: { $ref: "#/components/schemas/DesignStatus" },
+          description: "Filter designs by lifecycle status",
+        },
+        SupplementaryPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        SupplementaryLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        SupplementarySearchQueryParam: {
+          name: "search",
+          in: "query",
+          schema: { type: "string" },
+          description: "Search by supplementary material name",
+        },
+        SupplementaryIsActiveQueryParam: {
+          name: "isActive",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter supplementary materials by active or inactive status",
+        },
+        WorkerIdPathParam: {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Worker ID",
+        },
+        WorkerPaymentIdPathParam: {
+          name: "paymentId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Worker payment ID",
+        },
+        WorkerPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        WorkerLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        WorkerIsActiveQueryParam: {
+          name: "isActive",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter workers by active or inactive status",
+        },
+        WorkerSearchQueryParam: {
+          name: "search",
+          in: "query",
+          schema: { type: "string" },
+          description: "Search by worker name or phone",
+        },
+        WorkerCityQueryParam: {
+          name: "city",
+          in: "query",
+          schema: { type: "string" },
+          description: "Filter workers by city",
+        },
+        WorkerAssignmentStatusQueryParam: {
+          name: "status",
+          in: "query",
+          schema: { $ref: "#/components/schemas/AssignmentStatus" },
+          description: "Filter worker assignments by status",
+        },
+        WorkerAssignmentPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        WorkerAssignmentLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        WorkerPaymentTypeQueryParam: {
+          name: "paymentType",
+          in: "query",
+          schema: { $ref: "#/components/schemas/WorkerPaymentType" },
+          description: "Filter worker payments by payment type",
+        },
+        WorkerPaymentWorkerIdQueryParam: {
+          name: "workerId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter worker payments for a specific worker",
+        },
+        WorkerPaymentDateFromQueryParam: {
+          name: "dateFrom",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include worker payments from this date-time onward",
+        },
+        WorkerPaymentDateToQueryParam: {
+          name: "dateTo",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include worker payments up to this date-time",
+        },
+        WorkerPaymentPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        WorkerPaymentLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        AssignmentIdPathParam: {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Assignment ID",
+        },
+        GoodsReturnIdPathParam: {
+          name: "returnId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Goods return ID",
+        },
+        AssignmentPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        AssignmentLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        AssignmentWorkerIdQueryParam: {
+          name: "workerId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter assignments by worker ID",
+        },
+        AssignmentDesignIdQueryParam: {
+          name: "designId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter assignments by design ID",
+        },
+        AssignmentStatusQueryParam: {
+          name: "status",
+          in: "query",
+          schema: { $ref: "#/components/schemas/AssignmentStatus" },
+          description: "Filter assignments by status",
+        },
+        AssignmentDateFromQueryParam: {
+          name: "dateFrom",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include assignments issued from this date-time onward",
+        },
+        AssignmentDateToQueryParam: {
+          name: "dateTo",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include assignments issued up to this date-time",
+        },
+        GoodsReturnAssignmentIdQueryParam: {
+          name: "assignmentId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter goods returns by assignment ID",
+        },
+        GoodsReturnWorkerIdQueryParam: {
+          name: "workerId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter goods returns by worker ID",
+        },
+        GoodsReturnDateFromQueryParam: {
+          name: "dateFrom",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include goods returns from this date-time onward",
+        },
+        GoodsReturnDateToQueryParam: {
+          name: "dateTo",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include goods returns up to this date-time",
+        },
+        GoodsReturnPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        GoodsReturnLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
         },
       },
       responses: {
@@ -1402,6 +2893,174 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/RawMaterialStockResponse" },
+            },
+          },
+        },
+        DesignCategorySuccess: {
+          description: "Design category response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DesignCategoryResponse" },
+            },
+          },
+        },
+        DesignCategoryListSuccess: {
+          description: "Design category list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DesignCategoryListResponse" },
+            },
+          },
+        },
+        DesignSuccess: {
+          description: "Design response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DesignResponse" },
+            },
+          },
+        },
+        DesignListSuccess: {
+          description: "Design list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DesignListResponse" },
+            },
+          },
+        },
+        DesignSupplementaryNeedSuccess: {
+          description: "Design supplementary need response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DesignSupplementaryNeedResponse" },
+            },
+          },
+        },
+        DesignSupplementaryNeedListSuccess: {
+          description: "Design supplementary need list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DesignSupplementaryNeedListResponse" },
+            },
+          },
+        },
+        SupplementaryMaterialTypeSuccess: {
+          description: "Supplementary material type response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SupplementaryMaterialTypeResponse" },
+            },
+          },
+        },
+        SupplementaryMaterialTypeListSuccess: {
+          description: "Supplementary material type list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SupplementaryMaterialTypeListResponse" },
+            },
+          },
+        },
+        WorkerSuccess: {
+          description: "Worker response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerResponse" },
+            },
+          },
+        },
+        WorkerDetailSuccess: {
+          description: "Worker detail response with summary",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerDetailResponse" },
+            },
+          },
+        },
+        WorkerListSuccess: {
+          description: "Worker list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerListResponse" },
+            },
+          },
+        },
+        WorkerAssignmentListSuccess: {
+          description: "Worker assignment list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerAssignmentListResponse" },
+            },
+          },
+        },
+        WorkerPaymentListSuccess: {
+          description: "Worker payment list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerPaymentListResponse" },
+            },
+          },
+        },
+        WorkerPaymentSuccess: {
+          description: "Worker payment response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerPaymentResponse" },
+            },
+          },
+        },
+        CreateWorkerPaymentSuccess: {
+          description: "Worker payment created successfully with refreshed outstanding summary",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateWorkerPaymentResponse" },
+            },
+          },
+        },
+        WorkerLedgerSuccess: {
+          description: "Worker ledger response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerLedgerResponse" },
+            },
+          },
+        },
+        WorkerAssignmentSuccess: {
+          description: "Worker assignment response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WorkerAssignmentResponse" },
+            },
+          },
+        },
+        AssignmentGoodsReturnListSuccess: {
+          description: "Goods return list for a single assignment",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AssignmentGoodsReturnListResponse" },
+            },
+          },
+        },
+        GoodsReturnSuccess: {
+          description: "Goods return response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/GoodsReturnResponse" },
+            },
+          },
+        },
+        GoodsReturnListSuccess: {
+          description: "Paginated goods return list response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/GoodsReturnListResponse" },
+            },
+          },
+        },
+        GoodsReturnRecordSuccess: {
+          description: "Goods return creation response with updated assignment summary",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/GoodsReturnRecordResponse" },
             },
           },
         },
@@ -2034,31 +3693,890 @@ const options: swaggerJsdoc.Options = {
           },
           required: ["success", "data"],
         },
+        WorkerPaymentType: {
+          type: "string",
+          enum: ["EARNING_SETTLEMENT", "ADVANCE", "ADVANCE_RECOVERY"],
+          description:
+            "EARNING_SETTLEMENT settles completed work, ADVANCE records an early payout before work completion, and ADVANCE_RECOVERY records recovery of a previously given advance from worker earnings.",
+        },
+        AssignmentStatus: {
+          type: "string",
+          enum: ["ISSUED", "IN_PROGRESS", "PARTIALLY_RETURNED", "COMPLETED", "CLOSED"],
+        },
         Worker: {
           type: "object",
           properties: {
             id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
             name: { type: "string", example: "Ramesh Patel" },
-            phone: { type: "string", example: "9898989898" },
-            address: { type: "string", example: "Gota, Ahmedabad" },
-            idProofType: { type: "string", example: "Aadhar" },
-            idProofNumber: { type: "string", example: "XXXX-XXXX-1234" },
+            phone: { type: "string", nullable: true, example: "9898989898" },
+            alternatePhone: { type: "string", nullable: true, example: "9876501234" },
+            address: { type: "string", nullable: true, example: "Gota, Ahmedabad" },
+            city: { type: "string", nullable: true, example: "Ahmedabad" },
+            idProofType: { type: "string", nullable: true, example: "Aadhar" },
+            idProofNumber: { type: "string", nullable: true, example: "XXXX-XXXX-1234" },
+            openingBalance: { type: "string", example: "2500.00" },
+            openingBalanceType: {
+              type: "string",
+              enum: ["PAYABLE", "RECEIVABLE"],
+              example: "PAYABLE",
+            },
+            openingBalanceDate: { type: "string", format: "date-time", nullable: true },
+            notes: { type: "string", nullable: true, example: "Polishing specialist" },
             isActive: { type: "boolean", example: true },
+            deletedAt: { type: "string", format: "date-time", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        WorkerSummary: {
+          type: "object",
+          properties: {
+            totalEarned: { type: "string", example: "4800.00" },
+            totalPaid: { type: "string", example: "3000.00" },
+            advanceGiven: { type: "string", example: "500.00" },
+            outstandingBalance: { type: "string", example: "1800.00" },
+            activeAssignments: { type: "integer", example: 2 },
+            totalPiecesDelivered: { type: "integer", example: 265 },
+          },
+        },
+        WorkerLedgerEntry: {
+          type: "object",
+          properties: {
+            date: { type: "string", format: "date-time" },
+            type: {
+              type: "string",
+              enum: [
+                "OPENING_BALANCE",
+                "GOODS_RETURN",
+                "EARNING_SETTLEMENT",
+                "ADVANCE",
+                "ADVANCE_RECOVERY",
+              ],
+            },
+            description: { type: "string", example: "Goods return for AY-NK-001 - 20 accepted piece(s)" },
+            debit: { type: "string", example: "0.00" },
+            credit: { type: "string", example: "360.00" },
+            runningBalance: { type: "string", example: "860.00" },
+          },
+        },
+        DesignStatus: {
+          type: "string",
+          enum: ["ACTIVE", "DISCONTINUED", "DRAFT"],
+        },
+        DesignCategory: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Necklace" },
+            sortOrder: { type: "integer", example: 0 },
+            isActive: { type: "boolean", example: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            designsCount: { type: "integer", example: 3 },
           },
         },
         Design: {
           type: "object",
           properties: {
             id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            categoryId: { type: "string", format: "uuid" },
             designCode: { type: "string", example: "AY-NK-001" },
             name: { type: "string", example: "Classic Stone Necklace" },
+            description: {
+              type: "string",
+              nullable: true,
+              example: "Stone necklace with floral pattern",
+            },
             material: { type: "string", example: "Gold Plated" },
             finish: { type: "string", example: "Glossy" },
             diamondCount: { type: "integer", example: 12 },
             pieceRateRs: { type: "string", example: "18.00" },
             salePricePerDozen: { type: "string", example: "960.00" },
+            imageUrl: {
+              type: "string",
+              format: "uri",
+              nullable: true,
+              example: "https://example.com/designs/ay-nk-001.png",
+            },
+            status: { $ref: "#/components/schemas/DesignStatus" },
+            deletedAt: { type: "string", format: "date-time", nullable: true },
+            notes: { type: "string", nullable: true, example: "Top-selling necklace" },
+            createdById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            category: {
+              allOf: [{ $ref: "#/components/schemas/DesignCategory" }],
+            },
+            supplementaryNeeds: {
+              type: "array",
+              items: { $ref: "#/components/schemas/DesignSupplementaryNeed" },
+            },
+          },
+        },
+        DesignSupplementaryNeed: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            materialTypeId: { type: "string", format: "uuid" },
+            quantityPerPiece: { type: "string", example: "12.0000" },
+            notes: { type: "string", nullable: true, example: "Use premium stones only" },
+            materialType: { $ref: "#/components/schemas/SupplementaryMaterialType" },
+          },
+        },
+        SupplementaryMaterialType: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            name: { type: "string", example: "White Round Stones 3mm" },
+            unit: { type: "string", example: "pieces" },
+            description: {
+              type: "string",
+              nullable: true,
+              example: "Primary stone used for necklace work",
+            },
+            stockQuantity: { type: "string", example: "1500.0000" },
+            isActive: { type: "boolean", example: true },
+            deletedAt: { type: "string", format: "date-time", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        CreateDesignCategoryRequest: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: { type: "string", minLength: 2, example: "Necklace" },
+            sortOrder: { type: "integer", default: 0, example: 0 },
+          },
+        },
+        UpdateDesignCategoryRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            name: { type: "string", minLength: 2, example: "Bridal Necklace" },
+            sortOrder: { type: "integer", example: 10 },
             isActive: { type: "boolean", example: true },
           },
+        },
+        CreateDesignRequest: {
+          type: "object",
+          required: [
+            "categoryId",
+            "designCode",
+            "name",
+            "diamondCount",
+            "pieceRateRs",
+            "salePricePerDozen",
+          ],
+          properties: {
+            categoryId: { type: "string", format: "uuid" },
+            designCode: { type: "string", example: "AY-NK-001" },
+            name: { type: "string", minLength: 2, example: "Classic Stone Necklace" },
+            description: { type: "string", example: "Necklace with premium stone layout" },
+            material: { type: "string", example: "Gold Plated" },
+            finish: { type: "string", example: "Glossy" },
+            diamondCount: { type: "integer", minimum: 0, example: 12 },
+            pieceRateRs: { type: "number", minimum: 0.01, example: 18 },
+            salePricePerDozen: { type: "number", minimum: 0.01, example: 960 },
+            imageUrl: {
+              type: "string",
+              format: "uri",
+              example: "https://example.com/designs/ay-nk-001.png",
+            },
+            status: { $ref: "#/components/schemas/DesignStatus" },
+            notes: { type: "string", example: "High demand design" },
+          },
+        },
+        UpdateDesignRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            categoryId: { type: "string", format: "uuid" },
+            designCode: { type: "string", example: "AY-NK-001" },
+            name: { type: "string", minLength: 2, example: "Classic Stone Necklace" },
+            description: { type: "string", example: "Updated description" },
+            material: { type: "string", example: "Rhodium" },
+            finish: { type: "string", example: "Matte" },
+            diamondCount: { type: "integer", minimum: 0, example: 16 },
+            pieceRateRs: { type: "number", minimum: 0.01, example: 22 },
+            salePricePerDozen: { type: "number", minimum: 0.01, example: 1100 },
+            imageUrl: {
+              type: "string",
+              format: "uri",
+              example: "https://example.com/designs/ay-nk-001-v2.png",
+            },
+            status: { $ref: "#/components/schemas/DesignStatus" },
+            notes: { type: "string", example: "Updated factory specification" },
+          },
+        },
+        UpdateDesignStatusRequest: {
+          type: "object",
+          required: ["status"],
+          properties: {
+            status: { $ref: "#/components/schemas/DesignStatus" },
+          },
+        },
+        CreateDesignSupplementaryNeedRequest: {
+          type: "object",
+          required: ["materialTypeId", "quantityPerPiece"],
+          properties: {
+            materialTypeId: { type: "string", format: "uuid" },
+            quantityPerPiece: { type: "number", minimum: 0.0001, example: 12 },
+            notes: { type: "string", example: "Default template quantity" },
+          },
+        },
+        UpdateDesignSupplementaryNeedRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            quantityPerPiece: { type: "number", minimum: 0.0001, example: 14 },
+            notes: { type: "string", example: "Use extra stones for premium variant" },
+          },
+        },
+        CreateSupplementaryMaterialTypeRequest: {
+          type: "object",
+          required: ["name", "unit"],
+          properties: {
+            name: { type: "string", minLength: 2, example: "Golden Hook Fittings" },
+            unit: { type: "string", example: "pieces" },
+            description: { type: "string", example: "Standard earring hook fitting" },
+            stockQuantity: { type: "number", minimum: 0, example: 2500 },
+          },
+        },
+        UpdateSupplementaryMaterialTypeRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            name: { type: "string", minLength: 2, example: "Golden Hook Fittings" },
+            unit: { type: "string", example: "pieces" },
+            description: { type: "string", example: "Updated fitting description" },
+            isActive: { type: "boolean", example: true },
+          },
+        },
+        AdjustSupplementaryStockRequest: {
+          type: "object",
+          required: ["adjustment"],
+          properties: {
+            adjustment: { type: "number", example: -25 },
+            notes: { type: "string", example: "Damaged stock removed after count" },
+          },
+        },
+        DesignPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        SupplementaryPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        WorkerListItem: {
+          allOf: [
+            { $ref: "#/components/schemas/Worker" },
+            {
+              type: "object",
+              properties: {
+                activeAssignments: { type: "integer", example: 1 },
+              },
+            },
+          ],
+        },
+        WorkerDetail: {
+          allOf: [
+            { $ref: "#/components/schemas/Worker" },
+            {
+              type: "object",
+              properties: {
+                summary: { $ref: "#/components/schemas/WorkerSummary" },
+              },
+              required: ["summary"],
+            },
+          ],
+        },
+        WorkerAssignment: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            workerId: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            rawMaterialTypeId: { type: "string", format: "uuid" },
+            rawMaterialQty: { type: "string", example: "10.5000" },
+            expectedPieces: { type: "integer", example: 120 },
+            returnedPieces: { type: "integer", example: 48 },
+            rejectedPieces: { type: "integer", example: 2 },
+            pieceRateAtAssignment: { type: "string", example: "18.00" },
+            totalEarned: { type: "string", example: "864.00" },
+            status: { $ref: "#/components/schemas/AssignmentStatus" },
+            issuedAt: { type: "string", format: "date-time" },
+            expectedReturnDate: { type: "string", format: "date-time", nullable: true },
+            completedAt: { type: "string", format: "date-time", nullable: true },
+            notes: { type: "string", nullable: true, example: "Urgent bridal batch" },
+            createdById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            worker: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Ramesh Patel" },
+                phone: { type: "string", nullable: true, example: "9898989898" },
+              },
+            },
+            design: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                designCode: { type: "string", example: "AY-NK-001" },
+                name: { type: "string", example: "Classic Stone Necklace" },
+              },
+            },
+            rawMaterialType: { $ref: "#/components/schemas/RawMaterialType" },
+            rawMaterialIssuance: {
+              allOf: [{ $ref: "#/components/schemas/RawMaterialIssuance" }],
+              nullable: true,
+            },
+            supplementaryIssuances: {
+              type: "array",
+              items: { $ref: "#/components/schemas/SupplementaryIssuance" },
+            },
+            goodsReturns: {
+              type: "array",
+              items: { $ref: "#/components/schemas/GoodsReturn" },
+            },
+          },
+        },
+        WorkerAssignmentSummary: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            expectedPieces: { type: "integer", example: 120 },
+            returnedPieces: { type: "integer", example: 48 },
+            rejectedPieces: { type: "integer", example: 2 },
+            totalEarned: { type: "string", example: "864.00" },
+            status: { $ref: "#/components/schemas/AssignmentStatus" },
+            completedAt: { type: "string", format: "date-time", nullable: true },
+          },
+        },
+        SupplementaryIssuance: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            assignmentId: { type: "string", format: "uuid" },
+            materialTypeId: { type: "string", format: "uuid" },
+            quantity: { type: "string", example: "240.0000" },
+            notes: { type: "string", nullable: true, example: "Default template quantity" },
+            createdById: { type: "string", format: "uuid" },
+            issuedAt: { type: "string", format: "date-time" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            materialType: { $ref: "#/components/schemas/SupplementaryMaterialType" },
+          },
+        },
+        GoodsReturn: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            assignmentId: { type: "string", format: "uuid" },
+            piecesReturned: { type: "integer", example: 25 },
+            rejectedPieces: { type: "integer", example: 2 },
+            acceptedPieces: { type: "integer", example: 23 },
+            earningAmount: { type: "string", example: "414.00" },
+            returnedAt: { type: "string", format: "date-time" },
+            rejectionNotes: { type: "string", nullable: true, example: "2 pieces had broken stones" },
+            notes: { type: "string", nullable: true, example: "First batch received" },
+            createdById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            createdBy: {
+              type: "object",
+              nullable: true,
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Manager User" },
+              },
+            },
+            assignment: {
+              type: "object",
+              nullable: true,
+              properties: {
+                id: { type: "string", format: "uuid" },
+                status: { $ref: "#/components/schemas/AssignmentStatus" },
+                expectedPieces: { type: "integer", example: 120, nullable: true },
+                returnedPieces: { type: "integer", example: 48, nullable: true },
+                rejectedPieces: { type: "integer", example: 2, nullable: true },
+                totalEarned: { type: "string", example: "864.00", nullable: true },
+                worker: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Ramesh Patel" },
+                    phone: { type: "string", nullable: true, example: "9898989898" },
+                  },
+                },
+                design: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    designCode: { type: "string", example: "AY-NK-001" },
+                    name: { type: "string", example: "Classic Stone Necklace" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        WorkerPayment: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            workerId: { type: "string", format: "uuid" },
+            amount: { type: "string", example: "1500.00" },
+            paymentType: { $ref: "#/components/schemas/WorkerPaymentType" },
+            paymentMode: { type: "string", example: "CASH" },
+            paidAt: { type: "string", format: "date-time" },
+            notes: { type: "string", nullable: true, example: "Weekly settlement" },
+            recordedById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            worker: {
+              allOf: [{ $ref: "#/components/schemas/Worker" }],
+              nullable: true,
+            },
+            recordedBy: {
+              type: "object",
+              nullable: true,
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Manager User" },
+              },
+            },
+          },
+        },
+        WorkerPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        AssignmentPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        GoodsReturnPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        DesignCategoryResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/DesignCategory" },
+          },
+          required: ["success", "data"],
+        },
+        DesignCategoryListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/DesignCategory" },
+                },
+                pagination: { $ref: "#/components/schemas/DesignPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        DesignResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/Design" },
+          },
+          required: ["success", "data"],
+        },
+        DesignListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Design" },
+                },
+                pagination: { $ref: "#/components/schemas/DesignPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        DesignSupplementaryNeedResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/DesignSupplementaryNeed" },
+          },
+          required: ["success", "data"],
+        },
+        DesignSupplementaryNeedListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/DesignSupplementaryNeed" },
+            },
+          },
+          required: ["success", "data"],
+        },
+        SupplementaryMaterialTypeResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/SupplementaryMaterialType" },
+          },
+          required: ["success", "data"],
+        },
+        SupplementaryMaterialTypeListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/SupplementaryMaterialType" },
+                },
+                pagination: { $ref: "#/components/schemas/SupplementaryPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        CreateWorkerRequest: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: { type: "string", minLength: 2, example: "Ramesh Patel" },
+            phone: { type: "string", example: "9898989898" },
+            alternatePhone: { type: "string", example: "9876501234" },
+            address: { type: "string", example: "Gota, Ahmedabad" },
+            city: { type: "string", example: "Ahmedabad" },
+            idProofType: { type: "string", example: "Aadhar" },
+            idProofNumber: { type: "string", example: "XXXX-XXXX-1234" },
+            openingBalance: { type: "number", minimum: 0, default: 0, example: 2500 },
+            openingBalanceType: {
+              type: "string",
+              enum: ["PAYABLE", "RECEIVABLE"],
+              default: "PAYABLE",
+            },
+            openingBalanceDate: { type: "string", format: "date-time" },
+            notes: { type: "string", example: "Experienced in necklace finishing" },
+          },
+        },
+        UpdateWorkerRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            name: { type: "string", minLength: 2, example: "Ramesh Patel" },
+            phone: { type: "string", example: "9898989898" },
+            alternatePhone: { type: "string", example: "9876501234" },
+            address: { type: "string", example: "Naranpura, Ahmedabad" },
+            city: { type: "string", example: "Ahmedabad" },
+            idProofType: { type: "string", example: "PAN" },
+            idProofNumber: { type: "string", example: "ABCDE1234F" },
+            openingBalance: { type: "number", minimum: 0, example: 1500 },
+            openingBalanceType: { type: "string", enum: ["PAYABLE", "RECEIVABLE"] },
+            openingBalanceDate: { type: "string", format: "date-time" },
+            notes: { type: "string", example: "Updated onboarding note" },
+          },
+        },
+        CreateWorkerPaymentRequest: {
+          type: "object",
+          required: ["workerId", "amount", "paymentType"],
+          properties: {
+            workerId: { type: "string", format: "uuid" },
+            amount: { type: "number", minimum: 0.01, example: 1500 },
+            paymentType: { $ref: "#/components/schemas/WorkerPaymentType" },
+            paymentMode: { type: "string", default: "CASH", example: "CASH" },
+            paidAt: { type: "string", format: "date-time" },
+            notes: { type: "string", example: "Weekly settlement" },
+          },
+        },
+        CreateAssignmentRequest: {
+          type: "object",
+          required: [
+            "workerId",
+            "designId",
+            "rawMaterialTypeId",
+            "rawMaterialQty",
+            "expectedPieces",
+          ],
+          properties: {
+            workerId: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            rawMaterialTypeId: { type: "string", format: "uuid" },
+            rawMaterialQty: { type: "number", minimum: 0.0001, example: 10.5 },
+            expectedPieces: { type: "integer", minimum: 1, example: 120 },
+            expectedReturnDate: { type: "string", format: "date-time" },
+            notes: { type: "string", example: "Urgent bridal batch" },
+          },
+          description:
+            "Supplementary issuances are calculated automatically from the design's supplementary needs and do not need to be provided in this request.",
+        },
+        UpdateAssignmentRequest: {
+          type: "object",
+          description: "Provide at least one field to update",
+          properties: {
+            expectedReturnDate: { type: "string", format: "date-time" },
+            notes: { type: "string", example: "Updated expected completion date after discussion with worker" },
+          },
+        },
+        UpdateAssignmentStatusRequest: {
+          type: "object",
+          required: ["status"],
+          properties: {
+            status: {
+              type: "string",
+              enum: ["IN_PROGRESS"],
+              example: "IN_PROGRESS",
+            },
+          },
+        },
+        CloseAssignmentRequest: {
+          type: "object",
+          required: ["notes"],
+          properties: {
+            notes: { type: "string", minLength: 1, example: "Worker unavailable due to medical emergency" },
+          },
+        },
+        CreateGoodsReturnRequest: {
+          type: "object",
+          required: ["piecesReturned"],
+          properties: {
+            piecesReturned: { type: "integer", minimum: 1, example: 25 },
+            rejectedPieces: { type: "integer", minimum: 0, default: 0, example: 2 },
+            rejectionNotes: { type: "string", example: "2 pieces had broken stones" },
+            notes: { type: "string", example: "First batch received" },
+            returnedAt: { type: "string", format: "date-time" },
+          },
+        },
+        WorkerResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/Worker" },
+          },
+          required: ["success", "data"],
+        },
+        WorkerDetailResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/WorkerDetail" },
+          },
+          required: ["success", "data"],
+        },
+        WorkerListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/WorkerListItem" },
+                },
+                pagination: { $ref: "#/components/schemas/WorkerPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        WorkerAssignmentListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/WorkerAssignment" },
+                },
+                pagination: { $ref: "#/components/schemas/AssignmentPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        WorkerAssignmentResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/WorkerAssignment" },
+          },
+          required: ["success", "data"],
+        },
+        WorkerPaymentResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/WorkerPayment" },
+          },
+          required: ["success", "data"],
+        },
+        WorkerPaymentListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/WorkerPayment" },
+                },
+                pagination: { $ref: "#/components/schemas/WorkerPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        CreateWorkerPaymentResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                payment: { $ref: "#/components/schemas/WorkerPayment" },
+                summary: { $ref: "#/components/schemas/WorkerSummary" },
+              },
+              required: ["payment", "summary"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        WorkerLedgerResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/WorkerLedgerEntry" },
+            },
+          },
+          required: ["success", "data"],
+        },
+        AssignmentGoodsReturnListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/GoodsReturn" },
+            },
+          },
+          required: ["success", "data"],
+        },
+        GoodsReturnResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/GoodsReturn" },
+          },
+          required: ["success", "data"],
+        },
+        GoodsReturnListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/GoodsReturn" },
+                },
+                pagination: { $ref: "#/components/schemas/GoodsReturnPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        GoodsReturnRecordResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                goodsReturn: { $ref: "#/components/schemas/GoodsReturn" },
+                assignment: { $ref: "#/components/schemas/WorkerAssignmentSummary" },
+              },
+              required: ["goodsReturn", "assignment"],
+            },
+          },
+          required: ["success", "data"],
         },
         Party: {
           type: "object",
@@ -2430,10 +4948,8 @@ const options: swaggerJsdoc.Options = {
             id: { type: "string", format: "uuid" },
             tenantId: { type: "string", format: "uuid" },
             materialTypeId: { type: "string", format: "uuid" },
+            assignmentId: { type: "string", format: "uuid" },
             quantity: { type: "string", example: "12.5" },
-            issuedTo: { type: "string", nullable: true, example: "Worker A" },
-            referenceId: { type: "string", nullable: true },
-            referenceType: { type: "string", nullable: true, example: "MANUAL" },
             issuedAt: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true },
             createdById: { type: "string", format: "uuid" },
@@ -2665,16 +5181,7 @@ const options: swaggerJsdoc.Options = {
             returnedPieces: { type: "integer", example: 48 },
             rejectedPieces: { type: "integer", example: 2 },
             pieceRateAtAssignment: { type: "string", example: "18.00" },
-            status: {
-              type: "string",
-              enum: [
-                "ISSUED",
-                "IN_PROGRESS",
-                "PARTIALLY_RETURNED",
-                "COMPLETED",
-                "CLOSED",
-              ],
-            },
+            status: { $ref: "#/components/schemas/AssignmentStatus" },
             issuedAt: { type: "string", format: "date-time" },
           },
         },

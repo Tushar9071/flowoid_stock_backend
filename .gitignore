@@ -145,4 +145,4 @@ dist
 
 .claude
 /generated/prisma
-backup.dump
+*.dump
