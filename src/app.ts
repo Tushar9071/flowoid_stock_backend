@@ -21,6 +21,7 @@ import designsRoutes from "./modules/designs/designs.routes";
 import supplementaryRoutes from "./modules/supplementary/supplementary.routes";
 import workersRoutes from "./modules/workers/workers.routes";
 import assignmentsRoutes from "./modules/assignments/assignments.routes";
+import inventoryRoutes from "./modules/inventory/inventory.routes";
 
 
 
@@ -75,6 +76,7 @@ app.use("/api/tenants/:tenantId/designs", designsRoutes);
 app.use("/api/tenants/:tenantId/supplementary", supplementaryRoutes);
 app.use("/api/tenants/:tenantId/workers", workersRoutes);
 app.use("/api/tenants/:tenantId/assignments", assignmentsRoutes);
+app.use("/api/tenants/:tenantId/inventory", inventoryRoutes);
 
 // Global error handler - always last
 app.use(errorHandler);

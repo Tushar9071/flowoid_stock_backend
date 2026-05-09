@@ -29,6 +29,8 @@ model User {
   createdGoodsReturns         GoodsReturn[]
   recordedWorkerPayments      WorkerPayment[]
   createdSupplementaryIssuances SupplementaryIssuance[]
+  packagingBatches            PackagingBatch[]
+  inventoryAdjustments        InventoryAdjustment[]
   @@map("users")
 
 }
@@ -90,6 +92,11 @@ enum WorkerPaymentType {
   ADVANCE_RECOVERY    // deducting previously given advance
 }
 
+enum InventoryAdjustmentType {
+  UNPACKAGED
+  PACKAGED
+}
+
 model Tenant {
   id                 String       @id @default(uuid())
   name               String
@@ -119,6 +126,9 @@ model Tenant {
   workerAssignments          WorkerAssignment[]
   goodsReturns               GoodsReturn[]
   workerPayments             WorkerPayment[]
+  inventoryStocks            InventoryStock[]
+  packagingBatches           PackagingBatch[]
+  inventoryAdjustments       InventoryAdjustment[]
 
   @@map("tenants")
 }
@@ -457,6 +467,9 @@ model Design {
   // Relations
   assignments         WorkerAssignment[]
   supplementaryNeeds  DesignSupplementaryNeed[]  // what supplementary materials this design needs
+  inventoryStock      InventoryStock?
+  packagingBatches    PackagingBatch[]
+  inventoryAdjustments InventoryAdjustment[]
 
   @@unique([tenantId, designCode])
   @@index([tenantId, status])
@@ -640,4 +653,67 @@ model WorkerPayment {
   @@index([tenantId, workerId])
   @@index([tenantId, paidAt])
   @@map("worker_payments")
+}
+
+model InventoryStock {
+  id                   String                @id @default(uuid())
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId             String
+  design               Design                @relation(fields: [designId], references: [id])
+  designId             String                @unique
+  unpackagedPieces     Int                   @default(0)
+  packagedDozens       Int                   @default(0)
+  lowStockAlertAt      Int                   @default(0)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  packagingBatches     PackagingBatch[]
+  inventoryAdjustments InventoryAdjustment[]
+
+  @@index([tenantId, packagedDozens])
+  @@map("inventory_stocks")
+}
+
+model PackagingBatch {
+  id               String         @id @default(uuid())
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId         String
+  inventoryStock   InventoryStock @relation(fields: [inventoryStockId], references: [id])
+  inventoryStockId String
+  design           Design         @relation(fields: [designId], references: [id])
+  designId         String
+  dozensPackaged   Int
+  piecesUsed       Int
+  packedBy         User           @relation(fields: [packedById], references: [id])
+  packedById       String
+  packedAt         DateTime       @default(now())
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([tenantId, designId])
+  @@index([tenantId, packedAt])
+  @@map("packaging_batches")
+}
+
+model InventoryAdjustment {
+  id               String                  @id @default(uuid())
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId         String
+  inventoryStock   InventoryStock          @relation(fields: [inventoryStockId], references: [id])
+  inventoryStockId String
+  design           Design                  @relation(fields: [designId], references: [id])
+  designId         String
+  type             InventoryAdjustmentType
+  adjustment       Int
+  notes            String
+  adjustedBy       User                    @relation(fields: [adjustedById], references: [id])
+  adjustedById     String
+  adjustedAt       DateTime                @default(now())
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([tenantId, designId])
+  @@index([tenantId, adjustedAt])
+  @@map("inventory_adjustments")
 }

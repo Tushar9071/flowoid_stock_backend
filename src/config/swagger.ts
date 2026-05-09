@@ -35,6 +35,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Workers", description: "Tenant-scoped worker profiles, summaries, assignments, payments, and ledger views" },
       { name: "Assignments", description: "Worker assignments with automatic raw material and supplementary issuances" },
       { name: "Goods Returns", description: "Batch returns of finished goods against worker assignments" },
+      { name: "Inventory", description: "Finished goods stock, packaging batches, adjustments, and low stock alerts" },
     ],
     paths: {
       "/health": {
@@ -3064,6 +3065,70 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        InventoryStockSuccess: {
+          description: "Inventory stock response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InventoryStockResponse" },
+            },
+          },
+        },
+        InventoryStockDetailSuccess: {
+          description: "Inventory stock detail with packaging history",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InventoryStockDetailResponse" },
+            },
+          },
+        },
+        InventoryStockListSuccess: {
+          description: "Paginated inventory stock overview",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InventoryStockListResponse" },
+            },
+          },
+        },
+        InventoryLowStockAlertListSuccess: {
+          description: "Low stock inventory alert list",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InventoryLowStockAlertListResponse" },
+            },
+          },
+        },
+        PackagingBatchSuccess: {
+          description: "Packaging batch response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PackagingBatchResponse" },
+            },
+          },
+        },
+        PackagingBatchListSuccess: {
+          description: "Paginated packaging batch list",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PackagingBatchListResponse" },
+            },
+          },
+        },
+        PackagingBatchCreateSuccess: {
+          description: "Packaging batch created with updated stock summary",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PackagingBatchCreateResponse" },
+            },
+          },
+        },
+        InventoryAdjustmentCreateSuccess: {
+          description: "Inventory adjustment created with updated stock summary",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InventoryAdjustmentCreateResponse" },
+            },
+          },
+        },
         ValidationError: {
           description: "Validation error",
           content: {
@@ -5189,11 +5254,249 @@ const options: swaggerJsdoc.Options = {
           type: "object",
           properties: {
             id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
             designId: { type: "string", format: "uuid" },
             unpackagedPieces: { type: "integer", example: 84 },
             packagedDozens: { type: "integer", example: 15 },
             lowStockAlertAt: { type: "integer", example: 5 },
+            isLow: { type: "boolean", example: false },
+            createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
+            design: { $ref: "#/components/schemas/InventoryDesign" },
+          },
+        },
+        InventoryDesign: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            categoryId: { type: "string", format: "uuid" },
+            designCode: { type: "string", example: "AY-NK-001" },
+            name: { type: "string", example: "Classic Necklace" },
+            status: { type: "string", enum: ["ACTIVE", "DISCONTINUED", "DRAFT"] },
+            salePricePerDozen: { type: "string", example: "1200.00" },
+            category: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Necklace" },
+              },
+            },
+          },
+        },
+        InventoryPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        PackagingBatch: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            inventoryStockId: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            dozensPackaged: { type: "integer", example: 3 },
+            piecesUsed: { type: "integer", example: 36 },
+            packedById: { type: "string", format: "uuid" },
+            packedAt: { type: "string", format: "date-time" },
+            notes: { type: "string", nullable: true, example: "Packed for showroom stock" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            design: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                designCode: { type: "string", example: "AY-NK-001" },
+                name: { type: "string", example: "Classic Necklace" },
+                category: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Necklace" },
+                  },
+                },
+              },
+            },
+            packedBy: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Ravi Shah" },
+              },
+            },
+          },
+        },
+        InventoryAdjustment: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            inventoryStockId: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            type: { type: "string", enum: ["UNPACKAGED", "PACKAGED"] },
+            adjustment: { type: "integer", example: -2 },
+            notes: { type: "string", example: "Damaged goods written off" },
+            adjustedById: { type: "string", format: "uuid" },
+            adjustedAt: { type: "string", format: "date-time" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        InventoryLowStockAlert: {
+          allOf: [
+            { $ref: "#/components/schemas/InventoryStock" },
+            {
+              type: "object",
+              properties: {
+                deficitDozens: { type: "integer", example: 3 },
+              },
+            },
+          ],
+        },
+        InventoryStockResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/InventoryStock" },
+          },
+          required: ["success", "data"],
+        },
+        InventoryStockDetailResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              allOf: [
+                { $ref: "#/components/schemas/InventoryStock" },
+                {
+                  type: "object",
+                  properties: {
+                    packagingBatches: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/PackagingBatch" },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          required: ["success", "data"],
+        },
+        InventoryStockListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/InventoryStock" },
+                },
+                pagination: { $ref: "#/components/schemas/InventoryPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        InventoryLowStockAlertListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/InventoryLowStockAlert" },
+            },
+          },
+          required: ["success", "data"],
+        },
+        PackagingBatchResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/PackagingBatch" },
+          },
+          required: ["success", "data"],
+        },
+        PackagingBatchListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/PackagingBatch" },
+                },
+                pagination: { $ref: "#/components/schemas/InventoryPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        PackagingBatchCreateResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                batch: { $ref: "#/components/schemas/PackagingBatch" },
+                stock: { $ref: "#/components/schemas/InventoryStock" },
+              },
+              required: ["batch", "stock"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        InventoryAdjustmentCreateResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                adjustment: { $ref: "#/components/schemas/InventoryAdjustment" },
+                stock: { $ref: "#/components/schemas/InventoryStock" },
+              },
+              required: ["adjustment", "stock"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        CreatePackagingBatchRequest: {
+          type: "object",
+          required: ["designId", "dozensPackaged"],
+          properties: {
+            designId: { type: "string", format: "uuid" },
+            dozensPackaged: { type: "integer", minimum: 1, example: 3 },
+            notes: { type: "string", example: "Packed for showroom stock" },
+          },
+        },
+        UpdateInventoryLowStockAlertRequest: {
+          type: "object",
+          required: ["lowStockAlertAt"],
+          properties: {
+            lowStockAlertAt: { type: "integer", minimum: 0, example: 5 },
+          },
+        },
+        CreateInventoryAdjustmentRequest: {
+          type: "object",
+          required: ["type", "adjustment", "notes"],
+          properties: {
+            type: { type: "string", enum: ["UNPACKAGED", "PACKAGED"] },
+            adjustment: { type: "integer", example: -2 },
+            notes: { type: "string", example: "Damaged goods written off" },
           },
         },
         Permission: {
