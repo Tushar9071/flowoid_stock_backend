@@ -47,15 +47,19 @@ const STOCK_INCLUDE = {
 } as const;
 
 const PACKAGING_BATCH_INCLUDE = {
-  design: {
+  inventoryStock: {
     select: {
-      id: true,
-      designCode: true,
-      name: true,
-      category: {
+      design: {
         select: {
           id: true,
+          designCode: true,
           name: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
     },
@@ -68,9 +72,22 @@ const PACKAGING_BATCH_INCLUDE = {
   },
 } as const;
 
+type PackagingBatchWithRelations = Prisma.PackagingBatchGetPayload<{
+  include: typeof PACKAGING_BATCH_INCLUDE;
+}>;
+
 const normalizeOptionalString = (value?: string): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+};
+
+const formatPackagingBatch = (batch: PackagingBatchWithRelations) => {
+  const { inventoryStock, ...rest } = batch;
+
+  return {
+    ...rest,
+    design: inventoryStock.design,
+  };
 };
 
 const assertTenantAccess = async (tenantId: string, currentUser: CurrentUser) => {
@@ -133,7 +150,12 @@ const sumAdjustments = async (
   const result = await client.inventoryAdjustment.aggregate({
     where: {
       tenantId,
-      designId,
+      inventoryStock: {
+        is: {
+          tenantId,
+          designId,
+        },
+      },
       type,
     },
     _sum: {
@@ -173,7 +195,12 @@ const calculateStockTotals = async (
     client.packagingBatch.aggregate({
       where: {
         tenantId,
-        designId,
+        inventoryStock: {
+          is: {
+            tenantId,
+            designId,
+          },
+        },
       },
       _sum: {
         piecesUsed: true,
@@ -182,7 +209,12 @@ const calculateStockTotals = async (
     client.packagingBatch.aggregate({
       where: {
         tenantId,
-        designId,
+        inventoryStock: {
+          is: {
+            tenantId,
+            designId,
+          },
+        },
       },
       _sum: {
         dozensPackaged: true,
@@ -220,8 +252,16 @@ const syncInventoryStock = async (
   });
   const totals = await calculateStockTotals(client, tenantId, designId);
 
-  if (totals.unpackagedPieces < 0 || totals.packagedDozens < 0) {
-    throw validationError("Inventory stock cannot be negative");
+  if (totals.unpackagedPieces < 0) {
+    throw validationError(
+      `Inventory stock cannot be negative. Current unpackaged stock: ${totals.unpackagedPieces} pieces`,
+    );
+  }
+
+  if (totals.packagedDozens < 0) {
+    throw validationError(
+      `Inventory stock cannot be negative. Current packaged stock: ${totals.packagedDozens} dozens`,
+    );
   }
 
   return client.inventoryStock.upsert({
@@ -262,13 +302,19 @@ const getActivityDesignIds = async (tenantId: string) => {
     }),
     prisma.packagingBatch.findMany({
       where: { tenantId },
-      distinct: ["designId"],
-      select: { designId: true },
+      select: {
+        inventoryStock: {
+          select: { designId: true },
+        },
+      },
     }),
     prisma.inventoryAdjustment.findMany({
       where: { tenantId },
-      distinct: ["designId"],
-      select: { designId: true },
+      select: {
+        inventoryStock: {
+          select: { designId: true },
+        },
+      },
     }),
     prisma.inventoryStock.findMany({
       where: { tenantId },
@@ -279,8 +325,8 @@ const getActivityDesignIds = async (tenantId: string) => {
   return [
     ...new Set([
       ...assignments.map((item) => item.designId),
-      ...batches.map((item) => item.designId),
-      ...adjustments.map((item) => item.designId),
+      ...batches.map((item) => item.inventoryStock.designId),
+      ...adjustments.map((item) => item.inventoryStock.designId),
       ...stocks.map((item) => item.designId),
     ]),
   ];
@@ -358,7 +404,12 @@ export const getStockByDesign = async (
   const packagingBatches = await prisma.packagingBatch.findMany({
     where: {
       tenantId,
-      designId,
+      inventoryStock: {
+        is: {
+          tenantId,
+          designId,
+        },
+      },
     },
     orderBy: [{ packedAt: "asc" }, { id: "asc" }],
     include: PACKAGING_BATCH_INCLUDE,
@@ -366,7 +417,7 @@ export const getStockByDesign = async (
 
   return {
     ...withStockFlags(stock),
-    packagingBatches,
+    packagingBatches: packagingBatches.map(formatPackagingBatch),
   };
 };
 
@@ -412,7 +463,6 @@ export const createPackagingBatch = async (
       data: {
         tenantId,
         inventoryStockId: stock.id,
-        designId: input.designId,
         dozensPackaged: input.dozensPackaged,
         piecesUsed,
         packedById,
@@ -424,7 +474,7 @@ export const createPackagingBatch = async (
     const updatedStock = await syncInventoryStock(tx, tenantId, input.designId);
 
     return {
-      batch,
+      batch: formatPackagingBatch(batch),
       stock: withStockFlags(updatedStock),
     };
   });
@@ -439,8 +489,16 @@ export const getPackagingBatches = async (
 
   const where: Prisma.PackagingBatchWhereInput = {
     tenantId,
-    designId: query.designId,
   };
+
+  if (query.designId) {
+    where.inventoryStock = {
+      is: {
+        tenantId,
+        designId: query.designId,
+      },
+    };
+  }
 
   if (query.dateFrom || query.dateTo) {
     where.packedAt = {
@@ -465,7 +523,7 @@ export const getPackagingBatches = async (
   const totalPages = Math.max(1, Math.ceil(totalItems / query.limit));
 
   return {
-    items,
+    items: items.map(formatPackagingBatch),
     pagination: {
       page: query.page,
       limit: query.limit,
@@ -496,7 +554,7 @@ export const getPackagingBatchById = async (
     throw notFoundError("Packaging batch not found");
   }
 
-  return batch;
+  return formatPackagingBatch(batch);
 };
 
 export const updateLowStockAlert = async (
@@ -555,7 +613,6 @@ export const createStockAdjustment = async (
       data: {
         tenantId,
         inventoryStockId: stock.id,
-        designId,
         type: input.type,
         adjustment: input.adjustment,
         notes: input.notes.trim(),

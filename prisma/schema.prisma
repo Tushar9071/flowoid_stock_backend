@@ -468,8 +468,7 @@ model Design {
   assignments         WorkerAssignment[]
   supplementaryNeeds  DesignSupplementaryNeed[]  // what supplementary materials this design needs
   inventoryStock      InventoryStock?
-  packagingBatches    PackagingBatch[]
-  inventoryAdjustments InventoryAdjustment[]
+
 
   @@unique([tenantId, designCode])
   @@index([tenantId, status])
@@ -680,8 +679,6 @@ model PackagingBatch {
   tenantId         String
   inventoryStock   InventoryStock @relation(fields: [inventoryStockId], references: [id])
   inventoryStockId String
-  design           Design         @relation(fields: [designId], references: [id])
-  designId         String
   dozensPackaged   Int
   piecesUsed       Int
   packedBy         User           @relation(fields: [packedById], references: [id])
@@ -691,7 +688,7 @@ model PackagingBatch {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  @@index([tenantId, designId])
+  @@index([tenantId, inventoryStockId])
   @@index([tenantId, packedAt])
   @@map("packaging_batches")
 }
@@ -702,8 +699,6 @@ model InventoryAdjustment {
   tenantId         String
   inventoryStock   InventoryStock          @relation(fields: [inventoryStockId], references: [id])
   inventoryStockId String
-  design           Design                  @relation(fields: [designId], references: [id])
-  designId         String
   type             InventoryAdjustmentType
   adjustment       Int
   notes            String
@@ -713,7 +708,7 @@ model InventoryAdjustment {
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
-  @@index([tenantId, designId])
+  @@index([tenantId, inventoryStockId])
   @@index([tenantId, adjustedAt])
   @@map("inventory_adjustments")
 }

@@ -5295,13 +5295,16 @@ const options: swaggerJsdoc.Options = {
             hasPreviousPage: { type: "boolean", example: false },
           },
         },
+        InventoryAdjustmentType: {
+          type: "string",
+          enum: ["UNPACKAGED", "PACKAGED"],
+        },
         PackagingBatch: {
           type: "object",
           properties: {
             id: { type: "string", format: "uuid" },
             tenantId: { type: "string", format: "uuid" },
             inventoryStockId: { type: "string", format: "uuid" },
-            designId: { type: "string", format: "uuid" },
             dozensPackaged: { type: "integer", example: 3 },
             piecesUsed: { type: "integer", example: 36 },
             packedById: { type: "string", format: "uuid" },
@@ -5339,8 +5342,7 @@ const options: swaggerJsdoc.Options = {
             id: { type: "string", format: "uuid" },
             tenantId: { type: "string", format: "uuid" },
             inventoryStockId: { type: "string", format: "uuid" },
-            designId: { type: "string", format: "uuid" },
-            type: { type: "string", enum: ["UNPACKAGED", "PACKAGED"] },
+            type: { $ref: "#/components/schemas/InventoryAdjustmentType" },
             adjustment: { type: "integer", example: -2 },
             notes: { type: "string", example: "Damaged goods written off" },
             adjustedById: { type: "string", format: "uuid" },
@@ -5476,6 +5478,7 @@ const options: swaggerJsdoc.Options = {
         },
         CreatePackagingBatchRequest: {
           type: "object",
+          additionalProperties: false,
           required: ["designId", "dozensPackaged"],
           properties: {
             designId: { type: "string", format: "uuid" },
@@ -5485,6 +5488,7 @@ const options: swaggerJsdoc.Options = {
         },
         UpdateInventoryLowStockAlertRequest: {
           type: "object",
+          additionalProperties: false,
           required: ["lowStockAlertAt"],
           properties: {
             lowStockAlertAt: { type: "integer", minimum: 0, example: 5 },
@@ -5492,9 +5496,10 @@ const options: swaggerJsdoc.Options = {
         },
         CreateInventoryAdjustmentRequest: {
           type: "object",
+          additionalProperties: false,
           required: ["type", "adjustment", "notes"],
           properties: {
-            type: { type: "string", enum: ["UNPACKAGED", "PACKAGED"] },
+            type: { $ref: "#/components/schemas/InventoryAdjustmentType" },
             adjustment: { type: "integer", example: -2 },
             notes: { type: "string", example: "Damaged goods written off" },
           },

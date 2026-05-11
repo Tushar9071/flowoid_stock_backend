@@ -25,6 +25,24 @@ const optionalDate = z.preprocess((value) => {
   return value;
 }, z.date().optional());
 
+const optionalBoolean = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+
+  return value;
+}, z.boolean().optional());
+
 export const tenantParamsSchema = z.object({
   tenantId: z.string().uuid("Tenant ID must be a valid UUID"),
 });
@@ -42,17 +60,19 @@ export const listStockQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   designId: z.string().uuid("Design ID must be a valid UUID").optional(),
   categoryId: z.string().uuid("Category ID must be a valid UUID").optional(),
-  isLow: z.coerce.boolean().optional(),
+  isLow: optionalBoolean,
 });
 
-export const createPackagingBatchSchema = z.object({
-  designId: z.string().uuid("Design ID must be a valid UUID"),
-  dozensPackaged: z.coerce
-    .number()
-    .int("Dozens packaged must be a whole number")
-    .positive("Dozens packaged must be greater than 0"),
-  notes: optionalTrimmedString,
-});
+export const createPackagingBatchSchema = z
+  .object({
+    designId: z.string().uuid("Design ID must be a valid UUID"),
+    dozensPackaged: z.coerce
+      .number()
+      .int("Dozens packaged must be a whole number")
+      .positive("Dozens packaged must be greater than 0"),
+    notes: optionalTrimmedString,
+  })
+  .strict();
 
 export const listPackagingBatchesQuerySchema = z
   .object({
@@ -72,21 +92,25 @@ export const listPackagingBatchesQuerySchema = z
     }
   });
 
-export const updateLowStockAlertSchema = z.object({
-  lowStockAlertAt: z.coerce
-    .number()
-    .int("Low stock alert must be a whole number")
-    .min(0, "Low stock alert cannot be negative"),
-});
+export const updateLowStockAlertSchema = z
+  .object({
+    lowStockAlertAt: z.coerce
+      .number()
+      .int("Low stock alert must be a whole number")
+      .min(0, "Low stock alert cannot be negative"),
+  })
+  .strict();
 
-export const createStockAdjustmentSchema = z.object({
-  type: z.enum(["UNPACKAGED", "PACKAGED"]),
-  adjustment: z.coerce
-    .number()
-    .int("Adjustment must be a whole number")
-    .refine((value) => value !== 0, "Adjustment cannot be zero"),
-  notes: z.string().trim().min(1, "Adjustment notes are required"),
-});
+export const createStockAdjustmentSchema = z
+  .object({
+    type: z.enum(["UNPACKAGED", "PACKAGED"]),
+    adjustment: z.coerce
+      .number()
+      .int("Adjustment must be a whole number")
+      .refine((value) => value !== 0, "Adjustment cannot be zero"),
+    notes: z.string().trim().min(1, "Adjustment notes are required"),
+  })
+  .strict();
 
 export type TenantParams = z.infer<typeof tenantParamsSchema>;
 export type StockParams = z.infer<typeof stockParamsSchema>;
