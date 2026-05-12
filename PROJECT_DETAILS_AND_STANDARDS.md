@@ -15,7 +15,7 @@ Ayanshi Imitation BMS
 Purpose:
 
 ```text
-A tenant-based backend for imitation jewellery manufacturing, stock, workers, parties, inventory, roles, users, and accounting-adjacent business flows.
+A tenant-based backend for imitation jewellery manufacturing, stock, workers, parties, inventory, orders, dispatch, roles, users, and accounting-adjacent business flows.
 ```
 
 ---
@@ -350,6 +350,7 @@ Examples:
 /api/tenants/:tenantId/workers
 /api/tenants/:tenantId/assignments
 /api/tenants/:tenantId/inventory
+/api/tenants/:tenantId/orders
 ```
 
 Tenant access service pattern:
@@ -892,9 +893,10 @@ Packaged stock formula:
 packagedDozens =
   SUM(packagingBatches.dozensPackaged)
   + SUM(PACKAGED inventory adjustments)
+  - SUM(orderDispatchItems.dozensDispatched)
 ```
 
-Future modules, such as Orders/Dispatch, should subtract dispatched dozens from packaged stock.
+Orders/Dispatch subtracts dispatched dozens from packaged stock.
 
 Packaging rule:
 
@@ -909,6 +911,88 @@ Important behavior:
 - Adjustments are audited.
 - Stock cannot go negative.
 - Low stock alert is informational.
+- Dispatched order dozens are included in packaged stock calculation.
+
+---
+
+### Orders and Dispatch
+
+Purpose:
+
+```text
+Manage dealer orders from draft creation through confirmation, packing, partial/full dispatch, stock deduction, and party ledger SALE posting.
+```
+
+Main route:
+
+```text
+/api/tenants/:tenantId/orders
+```
+
+Models:
+
+```text
+Order
+OrderItem
+OrderDispatch
+OrderDispatchItem
+```
+
+Permissions:
+
+```text
+orders.read
+orders.create
+orders.update
+orders.dispatch
+orders.cancel
+```
+
+Order status:
+
+```text
+DRAFT
+CONFIRMED
+PACKED
+PARTIALLY_DISPATCHED
+DISPATCHED
+CANCELLED
+```
+
+Endpoints:
+
+```text
+GET    /
+POST   /
+GET    /overdue
+GET    /:orderId
+PATCH  /:orderId
+PATCH  /:orderId/confirm
+PATCH  /:orderId/pack
+PATCH  /:orderId/dispatch
+PATCH  /:orderId/cancel
+POST   /:orderId/items
+PATCH  /:orderId/items/:itemId
+DELETE /:orderId/items/:itemId
+GET    /:orderId/dispatch-summary
+```
+
+Important behavior:
+
+- Orders belong to tenants and dealers.
+- Dealer must be a `Party` with `type = DEALER`.
+- `orderNumber` is generated server-side and unique per tenant.
+- Prices are locked on `OrderItem.pricePerDozen`.
+- Totals are calculated server-side.
+- Draft orders do not validate stock.
+- Confirmation validates packaged stock and reserves stock conceptually.
+- Dispatch deducts packaged stock through `OrderDispatchItem`.
+- Partial dispatch is supported and tracked per line item.
+- Final dispatch status is `DISPATCHED`; partial dispatch status is `PARTIALLY_DISPATCHED`.
+- Dispatch creates `PartyLedgerEntry` with `entryType = SALE`, `voucherType = ORDER`, and `voucherId = order.id`.
+- Ledger debit totals reconcile to the order total across partial dispatches.
+- Cancellation is allowed before full dispatch and requires a reason.
+- `GET /overdue` is registered before `GET /:orderId`.
 
 ---
 
@@ -979,13 +1063,19 @@ Owner creates Packaging Batch
         |
         v
 Packaged dozens become sellable stock
+        |
+        v
+Dealer order is created, confirmed, packed, and dispatched
+        |
+        v
+Dispatched dozens reduce packaged stock and create dealer SALE ledger entry
 ```
 
 Accounting-adjacent flow:
 
 ```text
 Party opening balance -> Party ledger
-Future sales/orders -> Party ledger SALE entry
+Order dispatch -> Party ledger SALE entry
 Future payments -> Payment module
 ```
 
@@ -1118,6 +1208,7 @@ Workers
 Assignments
 Goods Returns
 Inventory
+Orders
 ```
 
 New module tag example:
@@ -1138,7 +1229,7 @@ Examples:
 - record goods return
 - create packaging batch
 - create inventory adjustment
-- future order dispatch
+- order dispatch
 - future payment posting
 
 Pattern:
@@ -1179,10 +1270,10 @@ accepted goods returns + unpackaged adjustments - packaging pieces used
 Packaged finished stock:
 
 ```text
-packaging batches + packaged adjustments
+packaging batches + packaged adjustments - order dispatch items
 ```
 
-Future order dispatch should:
+Order dispatch should:
 
 ```text
 deduct packaged dozens
@@ -1245,6 +1336,7 @@ Useful test guide already created:
 
 ```text
 SWAGGER_TESTING_AUTH_USER_TENANT_INVENTORY.md
+ORDERS_DISPATCH_TESTING.md
 ```
 
 ---
@@ -1302,6 +1394,16 @@ inventory.create
 inventory.update
 ```
 
+Orders:
+
+```text
+orders.read
+orders.create
+orders.update
+orders.dispatch
+orders.cancel
+```
+
 Monitoring:
 
 ```text
@@ -1346,13 +1448,11 @@ Editor errors often disappear after restarting TypeScript server.
 
 ---
 
-## 18. Future Module Guidance: Orders and Dispatch
+## 18. Orders and Dispatch Implementation Notes
 
-Order Dispatch work is currently stopped.
+Orders and Dispatch is implemented.
 
-When it resumes, the module should be developed from the provided specification and project standards.
-
-Likely module path:
+Module path:
 
 ```text
 src/modules/orders/orders.validation.ts
@@ -1361,13 +1461,13 @@ src/modules/orders/orders.controller.ts
 src/modules/orders/orders.routes.ts
 ```
 
-Likely route base:
+Route base:
 
 ```text
 /api/tenants/:tenantId/orders
 ```
 
-Likely permissions:
+Permissions:
 
 ```text
 orders.read
@@ -1377,7 +1477,7 @@ orders.dispatch
 orders.cancel
 ```
 
-Important future rules:
+Important rules:
 
 - Order numbers must be unique per tenant.
 - Dealer must be a `Party` with `type = DEALER`.
@@ -1388,8 +1488,8 @@ Important future rules:
 - Dispatch creates `PartyLedgerEntry` with `entryType = SALE`.
 - Dispatch must be a single transaction.
 - `GET /orders/overdue` must be registered before `GET /orders/:orderId`.
-
-Before coding Orders, first update inventory stock calculation to subtract dispatched dozens once order models exist.
+- Partial dispatch is supported with `OrderDispatch` and `OrderDispatchItem`.
+- Inventory stock calculation subtracts `OrderDispatchItem.dozensDispatched`.
 
 ---
 
@@ -1398,13 +1498,13 @@ Before coding Orders, first update inventory stock calculation to subtract dispa
 Short explanation:
 
 ```text
-This is a multi-tenant backend for an imitation jewellery business. It manages users, roles, tenants, dealers, suppliers, raw materials, designs, workers, production assignments, finished goods returns, inventory packaging, and business ledgers. The system tracks stock from purchase to worker issuance to finished goods packaging, while enforcing tenant isolation, authentication, permissions, and server-side business rules.
+This is a multi-tenant backend for an imitation jewellery business. It manages users, roles, tenants, dealers, suppliers, raw materials, designs, workers, production assignments, finished goods returns, inventory packaging, dealer orders, dispatch, and business ledgers. The system tracks stock from purchase to worker issuance to finished goods packaging and dealer dispatch, while enforcing tenant isolation, authentication, permissions, and server-side business rules.
 ```
 
 Long explanation:
 
 ```text
-The backend starts with user authentication and tenant creation. Each tenant represents a business. Within a tenant, the business creates parties such as dealers and suppliers, raw material catalogues, supplementary material catalogues, workers, and jewellery designs. Raw material purchases increase raw stock. Worker assignments issue raw and supplementary materials to workers. Goods returns record accepted finished pieces and worker earnings. Accepted pieces become unpackaged inventory. The owner packages pieces into dozens, creating packaged inventory ready for sale. Party ledgers and worker ledgers track financial history and outstanding balances. All APIs are documented in Swagger and protected by JWT authentication and role permissions.
+The backend starts with user authentication and tenant creation. Each tenant represents a business. Within a tenant, the business creates parties such as dealers and suppliers, raw material catalogues, supplementary material catalogues, workers, and jewellery designs. Raw material purchases increase raw stock. Worker assignments issue raw and supplementary materials to workers. Goods returns record accepted finished pieces and worker earnings. Accepted pieces become unpackaged inventory. The owner packages pieces into dozens, creating packaged inventory ready for sale. Dealer orders reserve stock during confirmation and deduct packaged stock during dispatch. Dispatch creates sale ledger entries for dealer receivables. Party ledgers and worker ledgers track financial history and outstanding balances. All APIs are documented in Swagger and protected by JWT authentication and role permissions.
 ```
 
 ---
@@ -1433,4 +1533,3 @@ Use this before submitting any feature:
 - [ ] Run `pnpm prisma validate`.
 - [ ] Run `pnpm build`.
 - [ ] Add a small testing guide for large modules.
-

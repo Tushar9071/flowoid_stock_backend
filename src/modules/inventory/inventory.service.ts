@@ -166,6 +166,24 @@ const sumAdjustments = async (
   return result._sum.adjustment ?? 0;
 };
 
+const getDispatchedDozens = async (
+  client: DbClient,
+  tenantId: string,
+  designId: string,
+) => {
+  const result = await client.orderDispatchItem.aggregate({
+    where: {
+      tenantId,
+      designId,
+    },
+    _sum: {
+      dozensDispatched: true,
+    },
+  });
+
+  return result._sum.dozensDispatched ?? 0;
+};
+
 const calculateStockTotals = async (
   client: DbClient,
   tenantId: string,
@@ -177,6 +195,7 @@ const calculateStockTotals = async (
     packagingDozens,
     unpackagedAdjustments,
     packagedAdjustments,
+    dispatchedDozens,
   ] = await Promise.all([
     client.goodsReturn.aggregate({
       where: {
@@ -222,6 +241,7 @@ const calculateStockTotals = async (
     }),
     sumAdjustments(client, tenantId, designId, "UNPACKAGED"),
     sumAdjustments(client, tenantId, designId, "PACKAGED"),
+    getDispatchedDozens(client, tenantId, designId),
   ]);
 
   const unpackagedPieces =
@@ -229,7 +249,9 @@ const calculateStockTotals = async (
     unpackagedAdjustments -
     (packagingPieces._sum.piecesUsed ?? 0);
   const packagedDozens =
-    (packagingDozens._sum.dozensPackaged ?? 0) + packagedAdjustments;
+    (packagingDozens._sum.dozensPackaged ?? 0) +
+    packagedAdjustments -
+    dispatchedDozens;
 
   return {
     unpackagedPieces,
@@ -289,7 +311,7 @@ const withStockFlags = <T extends { packagedDozens: number; lowStockAlertAt: num
 });
 
 const getActivityDesignIds = async (tenantId: string) => {
-  const [assignments, batches, adjustments, stocks] = await Promise.all([
+  const [assignments, batches, adjustments, stocks, dispatchItems] = await Promise.all([
     prisma.workerAssignment.findMany({
       where: {
         tenantId,
@@ -320,6 +342,11 @@ const getActivityDesignIds = async (tenantId: string) => {
       where: { tenantId },
       select: { designId: true },
     }),
+    prisma.orderDispatchItem.findMany({
+      where: { tenantId },
+      distinct: ["designId"],
+      select: { designId: true },
+    }),
   ]);
 
   return [
@@ -328,6 +355,7 @@ const getActivityDesignIds = async (tenantId: string) => {
       ...batches.map((item) => item.inventoryStock.designId),
       ...adjustments.map((item) => item.inventoryStock.designId),
       ...stocks.map((item) => item.designId),
+      ...dispatchItems.map((item) => item.designId),
     ]),
   ];
 };

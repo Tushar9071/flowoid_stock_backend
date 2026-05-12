@@ -36,6 +36,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Assignments", description: "Worker assignments with automatic raw material and supplementary issuances" },
       { name: "Goods Returns", description: "Batch returns of finished goods against worker assignments" },
       { name: "Inventory", description: "Finished goods stock, packaging batches, adjustments, and low stock alerts" },
+      { name: "Orders", description: "Dealer orders, dispatches, packaged stock deduction, and sale ledger entries" },
     ],
     paths: {
       "/health": {
@@ -2265,6 +2266,20 @@ const options: swaggerJsdoc.Options = {
           schema: { type: "string", format: "uuid" },
           description: "Tenant ID",
         },
+        OrderIdPathParam: {
+          name: "orderId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Order ID",
+        },
+        OrderItemIdPathParam: {
+          name: "itemId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Order item ID",
+        },
         PartyIdPathParam: {
           name: "partyId",
           in: "path",
@@ -3126,6 +3141,38 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/InventoryAdjustmentCreateResponse" },
+            },
+          },
+        },
+        OrderSuccess: {
+          description: "Order response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OrderResponse" },
+            },
+          },
+        },
+        OrderListSuccess: {
+          description: "Paginated order list",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OrderListResponse" },
+            },
+          },
+        },
+        OverdueOrderListSuccess: {
+          description: "Overdue order list",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OverdueOrderListResponse" },
+            },
+          },
+        },
+        OrderDispatchSummarySuccess: {
+          description: "Printable order dispatch summary",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OrderDispatchSummaryResponse" },
             },
           },
         },
@@ -5197,21 +5244,6 @@ const options: swaggerJsdoc.Options = {
             notes: { type: "string" },
           },
         },
-        Order: {
-          type: "object",
-          properties: {
-            id: { type: "string", format: "uuid" },
-            orderNumber: { type: "string", example: "ORD-2025-0001" },
-            status: {
-              type: "string",
-              enum: ["DRAFT", "CONFIRMED", "PACKED", "DISPATCHED", "CANCELLED"],
-            },
-            totalAmount: { type: "string", example: "4800.00" },
-            isCreditOrder: { type: "boolean", example: true },
-            dueDate: { type: "string", format: "date-time" },
-            dispatchedAt: { type: "string", format: "date-time" },
-          },
-        },
         Payment: {
           type: "object",
           properties: {
@@ -5502,6 +5534,323 @@ const options: swaggerJsdoc.Options = {
             type: { $ref: "#/components/schemas/InventoryAdjustmentType" },
             adjustment: { type: "integer", example: -2 },
             notes: { type: "string", example: "Damaged goods written off" },
+          },
+        },
+        OrderStatus: {
+          type: "string",
+          enum: [
+            "DRAFT",
+            "CONFIRMED",
+            "PACKED",
+            "PARTIALLY_DISPATCHED",
+            "DISPATCHED",
+            "CANCELLED",
+          ],
+        },
+        OrderDealer: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            type: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+            name: { type: "string", example: "R K Jewellers" },
+            code: { type: "string", nullable: true, example: "RKJ" },
+            contactPerson: { type: "string", nullable: true, example: "Ramesh Shah" },
+            phone: { type: "string", nullable: true, example: "9876543210" },
+            email: { type: "string", nullable: true, example: "dealer@example.com" },
+            addressLine1: { type: "string", nullable: true },
+            addressLine2: { type: "string", nullable: true },
+            city: { type: "string", nullable: true, example: "Surat" },
+            state: { type: "string", nullable: true, example: "Gujarat" },
+            country: { type: "string", nullable: true, example: "India" },
+            postalCode: { type: "string", nullable: true },
+            creditPeriodDays: { type: "integer", nullable: true, example: 30 },
+          },
+        },
+        OrderDesign: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            designCode: { type: "string", example: "AY-NK-001" },
+            name: { type: "string", example: "Classic Necklace" },
+            category: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Necklace" },
+              },
+            },
+          },
+        },
+        OrderItem: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            orderId: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            quantityDozens: { type: "integer", example: 10 },
+            dispatchedDozens: { type: "integer", example: 4 },
+            remainingDozens: { type: "integer", example: 6 },
+            pricePerDozen: { type: "string", example: "1200.00" },
+            lineTotal: { type: "string", example: "12000.00" },
+            notes: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            design: { $ref: "#/components/schemas/OrderDesign" },
+          },
+        },
+        OrderDispatchItem: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            dispatchId: { type: "string", format: "uuid" },
+            orderItemId: { type: "string", format: "uuid" },
+            inventoryStockId: { type: "string", format: "uuid" },
+            designId: { type: "string", format: "uuid" },
+            dozensDispatched: { type: "integer", example: 4 },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        OrderDispatch: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            orderId: { type: "string", format: "uuid" },
+            transportMode: { type: "string", example: "DTDC" },
+            trackingRef: { type: "string", nullable: true, example: "D123456789" },
+            dispatchedAt: { type: "string", format: "date-time" },
+            dispatchedById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            items: {
+              type: "array",
+              items: { $ref: "#/components/schemas/OrderDispatchItem" },
+            },
+          },
+        },
+        Order: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            dealerId: { type: "string", format: "uuid" },
+            orderNumber: { type: "string", example: "ORD-2026-0001" },
+            status: { $ref: "#/components/schemas/OrderStatus" },
+            orderDate: { type: "string", format: "date-time" },
+            isCreditOrder: { type: "boolean", example: true },
+            dueDate: { type: "string", format: "date-time", nullable: true },
+            subtotalAmount: { type: "string", example: "12000.00" },
+            discountAmount: { type: "string", example: "500.00" },
+            totalAmount: { type: "string", example: "11500.00" },
+            notes: { type: "string", nullable: true },
+            confirmedAt: { type: "string", format: "date-time", nullable: true },
+            packedAt: { type: "string", format: "date-time", nullable: true },
+            dispatchedAt: { type: "string", format: "date-time", nullable: true },
+            transportMode: { type: "string", nullable: true },
+            trackingRef: { type: "string", nullable: true },
+            cancelledAt: { type: "string", format: "date-time", nullable: true },
+            cancelReason: { type: "string", nullable: true },
+            createdById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            totalDozens: { type: "integer", example: 10 },
+            dispatchedDozens: { type: "integer", example: 4 },
+            remainingDozens: { type: "integer", example: 6 },
+            isOverdue: { type: "boolean", example: false },
+            outstandingAmount: { type: "string", example: "11500.00" },
+            dealer: { $ref: "#/components/schemas/OrderDealer" },
+            items: {
+              type: "array",
+              items: { $ref: "#/components/schemas/OrderItem" },
+            },
+            dispatches: {
+              type: "array",
+              items: { $ref: "#/components/schemas/OrderDispatch" },
+            },
+          },
+        },
+        OrderPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        OrderResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/Order" },
+          },
+          required: ["success", "data"],
+        },
+        OrderListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Order" },
+                },
+                pagination: { $ref: "#/components/schemas/OrderPagination" },
+              },
+              required: ["items", "pagination"],
+            },
+          },
+          required: ["success", "data"],
+        },
+        OverdueOrderListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: {
+                allOf: [
+                  { $ref: "#/components/schemas/Order" },
+                  {
+                    type: "object",
+                    properties: {
+                      daysOverdue: { type: "integer", example: 12 },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+        OrderDispatchSummaryResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                order: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    orderNumber: { type: "string", example: "ORD-2026-0001" },
+                    orderDate: { type: "string", format: "date-time" },
+                    status: { $ref: "#/components/schemas/OrderStatus" },
+                    totalAmount: { type: "string", example: "11500.00" },
+                    transportMode: { type: "string", nullable: true },
+                    trackingRef: { type: "string", nullable: true },
+                    dispatchedAt: { type: "string", format: "date-time", nullable: true },
+                  },
+                },
+                dealer: { $ref: "#/components/schemas/OrderDealer" },
+                items: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      designCode: { type: "string", example: "AY-NK-001" },
+                      designName: { type: "string", example: "Classic Necklace" },
+                      dispatchedDozens: { type: "integer", example: 4 },
+                      remainingDozens: { type: "integer", example: 6 },
+                    },
+                  },
+                },
+                totalDozensDispatched: { type: "integer", example: 4 },
+                totalAmount: { type: "string", example: "11500.00" },
+                dispatches: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/OrderDispatch" },
+                },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+        CreateOrderItemRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["designId", "quantityDozens"],
+          properties: {
+            designId: { type: "string", format: "uuid" },
+            quantityDozens: { type: "integer", minimum: 1, example: 10 },
+            pricePerDozen: { type: "number", minimum: 0, example: 1200 },
+            notes: { type: "string", example: "Priority design" },
+          },
+        },
+        CreateOrderRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["dealerId", "isCreditOrder", "items"],
+          properties: {
+            dealerId: { type: "string", format: "uuid" },
+            isCreditOrder: { type: "boolean", example: true },
+            items: {
+              type: "array",
+              minItems: 1,
+              items: { $ref: "#/components/schemas/CreateOrderItemRequest" },
+            },
+            discountAmount: { type: "number", minimum: 0, example: 500 },
+            notes: { type: "string", example: "Dealer requested early dispatch" },
+          },
+        },
+        UpdateOrderRequest: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            discountAmount: { type: "number", minimum: 0, example: 500 },
+            notes: { type: "string", example: "Updated order note" },
+            isCreditOrder: { type: "boolean", example: false },
+          },
+        },
+        AddOrderItemRequest: {
+          allOf: [{ $ref: "#/components/schemas/CreateOrderItemRequest" }],
+        },
+        UpdateOrderItemRequest: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            quantityDozens: { type: "integer", minimum: 1, example: 12 },
+            pricePerDozen: { type: "number", minimum: 0, example: 1250 },
+            notes: { type: "string", example: "Negotiated price" },
+          },
+        },
+        DispatchOrderRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["transportMode"],
+          properties: {
+            transportMode: { type: "string", example: "DTDC" },
+            trackingRef: { type: "string", example: "D123456789" },
+            dispatchedAt: { type: "string", format: "date-time" },
+            items: {
+              type: "array",
+              description: "Optional partial dispatch list. If omitted, all remaining dozens are dispatched.",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["itemId", "dozens"],
+                properties: {
+                  itemId: { type: "string", format: "uuid" },
+                  dozens: { type: "integer", minimum: 1, example: 4 },
+                },
+              },
+            },
+          },
+        },
+        CancelOrderRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["cancelReason"],
+          properties: {
+            cancelReason: { type: "string", example: "Dealer cancelled before dispatch" },
           },
         },
         Permission: {
