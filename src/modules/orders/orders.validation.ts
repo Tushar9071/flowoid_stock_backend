@@ -96,15 +96,35 @@ export const orderItemParamsSchema = orderParamsSchema.extend({
   itemId: z.string().uuid("Order item ID must be a valid UUID"),
 });
 
-const createOrderItemSchema = z.object({
-  designId: z.string().uuid("Design ID must be a valid UUID"),
-  quantityDozens: z.coerce
-    .number()
-    .int("Quantity must be a whole number of dozens")
-    .positive("Quantity dozens must be greater than 0"),
-  pricePerDozen: optionalMoney,
-  notes: optionalTrimmedString,
-});
+const optionalPositiveMoney = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+
+  return value;
+}, z.number().finite().positive().optional());
+
+const createOrderItemSchema = z
+  .object({
+    designId: z.string().uuid("Design ID must be a valid UUID"),
+    quantityDozens: z.coerce
+      .number()
+      .int("Quantity must be a whole number of dozens")
+      .positive("Quantity dozens must be greater than 0"),
+    pricePerDozen: optionalPositiveMoney,
+    notes: optionalTrimmedString,
+  })
+  .strict();
 
 export const createOrderSchema = z
   .object({

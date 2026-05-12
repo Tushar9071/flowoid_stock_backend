@@ -174,14 +174,19 @@ const getDispatchedDozens = async (
   const result = await client.orderDispatchItem.aggregate({
     where: {
       tenantId,
-      designId,
+      orderItem: {
+        is: {
+          tenantId,
+          designId,
+        },
+      },
     },
     _sum: {
       dozensDispatched: true,
     },
   });
 
-  return result._sum.dozensDispatched ?? 0;
+  return result._sum?.dozensDispatched ?? 0;
 };
 
 const calculateStockTotals = async (
@@ -344,8 +349,11 @@ const getActivityDesignIds = async (tenantId: string) => {
     }),
     prisma.orderDispatchItem.findMany({
       where: { tenantId },
-      distinct: ["designId"],
-      select: { designId: true },
+      select: {
+        orderItem: {
+          select: { designId: true },
+        },
+      },
     }),
   ]);
 
@@ -355,7 +363,7 @@ const getActivityDesignIds = async (tenantId: string) => {
       ...batches.map((item) => item.inventoryStock.designId),
       ...adjustments.map((item) => item.inventoryStock.designId),
       ...stocks.map((item) => item.designId),
-      ...dispatchItems.map((item) => item.designId),
+      ...dispatchItems.map((item) => item.orderItem.designId),
     ]),
   ];
 };

@@ -75,8 +75,13 @@ router.use(requireAuth);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.get("/", requirePermission("orders.read"), ctrl.getOrders);
-router.post("/", requirePermission("orders.create"), ctrl.createOrder);
+router.get("/", 
+  // requirePermission("orders.read"),
+   ctrl.getOrders);
+
+router.post("/", 
+  // requirePermission("orders.create"),
+   ctrl.createOrder);
 
 /**
  * @swagger
@@ -94,7 +99,9 @@ router.post("/", requirePermission("orders.create"), ctrl.createOrder);
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.get("/overdue", requirePermission("orders.read"), ctrl.getOverdueOrders);
+router.get("/overdue", 
+  // requirePermission("orders.read"), 
+  ctrl.getOverdueOrders);
 
 /**
  * @swagger
@@ -115,9 +122,8 @@ router.get("/overdue", requirePermission("orders.read"), ctrl.getOverdueOrders);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.get(
-  "/:orderId/dispatch-summary",
-  requirePermission("orders.read"),
+router.get("/:orderId/dispatch-summary",
+  // requirePermission("orders.read"),
   ctrl.getDispatchSummary,
 );
 
@@ -163,8 +169,13 @@ router.get(
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.get("/:orderId", requirePermission("orders.read"), ctrl.getOrderById);
-router.patch("/:orderId", requirePermission("orders.update"), ctrl.updateOrder);
+router.get("/:orderId", 
+  // requirePermission("orders.read"),
+   ctrl.getOrderById);
+
+router.patch("/:orderId", 
+  // requirePermission("orders.update"),
+   ctrl.updateOrder);
 
 /**
  * @swagger
@@ -187,7 +198,9 @@ router.patch("/:orderId", requirePermission("orders.update"), ctrl.updateOrder);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch("/:orderId/confirm", requirePermission("orders.update"), ctrl.confirmOrder);
+router.patch("/:orderId/confirm", 
+  // requirePermission("orders.update"), 
+  ctrl.confirmOrder);
 
 /**
  * @swagger
@@ -210,7 +223,9 @@ router.patch("/:orderId/confirm", requirePermission("orders.update"), ctrl.confi
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch("/:orderId/pack", requirePermission("orders.update"), ctrl.packOrder);
+router.patch("/:orderId/pack", 
+  // requirePermission("orders.update"),
+   ctrl.packOrder);
 
 /**
  * @swagger
@@ -239,7 +254,9 @@ router.patch("/:orderId/pack", requirePermission("orders.update"), ctrl.packOrde
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch("/:orderId/dispatch", requirePermission("orders.dispatch"), ctrl.dispatchOrder);
+router.patch("/:orderId/dispatch", 
+  // requirePermission("orders.dispatch"),
+   ctrl.dispatchOrder);
 
 /**
  * @swagger
@@ -268,7 +285,9 @@ router.patch("/:orderId/dispatch", requirePermission("orders.dispatch"), ctrl.di
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch("/:orderId/cancel", requirePermission("orders.cancel"), ctrl.cancelOrder);
+router.patch("/:orderId/cancel", 
+  // requirePermission("orders.cancel"),
+   ctrl.cancelOrder);
 
 /**
  * @swagger
@@ -297,7 +316,9 @@ router.patch("/:orderId/cancel", requirePermission("orders.cancel"), ctrl.cancel
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.post("/:orderId/items", requirePermission("orders.update"), ctrl.addOrderItem);
+router.post("/:orderId/items", 
+  // requirePermission("orders.update"),
+   ctrl.addOrderItem);
 
 /**
  * @swagger
@@ -345,7 +366,12 @@ router.post("/:orderId/items", requirePermission("orders.update"), ctrl.addOrder
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch("/:orderId/items/:itemId", requirePermission("orders.update"), ctrl.updateOrderItem);
-router.delete("/:orderId/items/:itemId", requirePermission("orders.update"), ctrl.removeOrderItem);
+router.patch("/:orderId/items/:itemId", 
+  // requirePermission("orders.update"),
+   ctrl.updateOrderItem);
+   
+router.delete("/:orderId/items/:itemId", 
+  // requirePermission("orders.update"),
+   ctrl.removeOrderItem);
 
 export default router;

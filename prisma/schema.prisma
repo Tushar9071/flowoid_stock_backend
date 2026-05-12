@@ -483,7 +483,6 @@ model Design {
   supplementaryNeeds DesignSupplementaryNeed[] // what supplementary materials this design needs
   inventoryStock     InventoryStock?
   orderItems         OrderItem[]
-  orderDispatchItems OrderDispatchItem[]
 
   @@unique([tenantId, designCode])
   @@index([tenantId, status])
@@ -748,8 +747,6 @@ model Order {
   confirmedAt    DateTime?
   packedAt       DateTime?
   dispatchedAt   DateTime?
-  transportMode  String?
-  trackingRef    String?
   cancelledAt    DateTime?
   cancelReason   String?
   deletedAt      DateTime?
@@ -824,8 +821,6 @@ model OrderDispatchItem {
   orderItemId      String
   inventoryStock   InventoryStock @relation(fields: [inventoryStockId], references: [id])
   inventoryStockId String
-  design           Design         @relation(fields: [designId], references: [id])
-  designId         String
   dozensDispatched Int
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt

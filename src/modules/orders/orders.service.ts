@@ -136,12 +136,14 @@ const addDays = (date: Date, days: number): Date => {
 const getRemainingDozens = (item: { quantityDozens: number; dispatchedDozens: number }) =>
   item.quantityDozens - item.dispatchedDozens;
 
+const DISPATCHED_ORDER_STATUSES = ["DISPATCHED", "PARTIALLY_DISPATCHED"] as const;
+
 const isOrderOverdue = (order: {
   status: string;
   isCreditOrder: boolean;
   dueDate: Date | null;
 }) =>
-  order.status === "DISPATCHED" &&
+  DISPATCHED_ORDER_STATUSES.includes(order.status as (typeof DISPATCHED_ORDER_STATUSES)[number]) &&
   order.isCreditOrder &&
   !!order.dueDate &&
   order.dueDate.getTime() < Date.now();
@@ -333,6 +335,7 @@ const getOrderDetailsOrThrow = async (tenantId: string, orderId: string) => {
     where: {
       id: orderId,
       tenantId,
+      deletedAt: null,
     },
     include: ORDER_DETAILS_INCLUDE,
   });
@@ -353,6 +356,7 @@ const getOrderForMutationOrThrow = async (
     where: {
       id: orderId,
       tenantId,
+      deletedAt: null,
     },
     include: {
       dealer: {
@@ -388,14 +392,19 @@ const getDispatchedDozens = async (
   const dispatched = await client.orderDispatchItem.aggregate({
     where: {
       tenantId,
-      designId,
+      orderItem: {
+        is: {
+          tenantId,
+          designId,
+        },
+      },
     },
     _sum: {
       dozensDispatched: true,
     },
   });
 
-  return dispatched._sum.dozensDispatched ?? 0;
+  return dispatched._sum?.dozensDispatched ?? 0;
 };
 
 const sumAdjustments = async (
@@ -726,6 +735,7 @@ export const getOrders = async (
 
   const where: Prisma.OrderWhereInput = {
     tenantId,
+    deletedAt: null,
     dealerId: query.dealerId,
     status: query.status,
     isCreditOrder: query.isCreditOrder,
@@ -744,13 +754,13 @@ export const getOrders = async (
 
   if (query.isOverdue === true) {
     where.isCreditOrder = true;
-    where.status = "DISPATCHED";
+    where.status = { in: [...DISPATCHED_ORDER_STATUSES] };
     where.dueDate = { lt: new Date() };
   } else if (query.isOverdue === false) {
     where.NOT = {
       AND: [
         { isCreditOrder: true },
-        { status: "DISPATCHED" },
+        { status: { in: [...DISPATCHED_ORDER_STATUSES] } },
         { dueDate: { lt: new Date() } },
       ],
     };
@@ -1079,7 +1089,6 @@ export const dispatchOrder = async (
           dispatchId: dispatch.id,
           orderItemId: dispatchItem.orderItem.id,
           inventoryStockId: stock.id,
-          designId: dispatchItem.orderItem.designId,
           dozensDispatched: dispatchItem.dozens,
         },
       });
@@ -1126,8 +1135,6 @@ export const dispatchOrder = async (
       data: {
         status: isFullyDispatched ? "DISPATCHED" : "PARTIALLY_DISPATCHED",
         dispatchedAt: isFullyDispatched ? dispatchedAt : order.dispatchedAt,
-        transportMode: input.transportMode.trim(),
-        trackingRef: normalizeOptionalString(input.trackingRef),
       },
     });
   });
@@ -1145,6 +1152,10 @@ export const cancelOrder = async (
 
   await prisma.$transaction(async (tx) => {
     const order = await getOrderForMutationOrThrow(tx, tenantId, orderId);
+
+    if (order.status === "PARTIALLY_DISPATCHED") {
+      throw validationError("Partially dispatched orders cannot be cancelled");
+    }
 
     if (order.status === "DISPATCHED") {
       throw validationError("Dispatched orders cannot be cancelled");
@@ -1291,18 +1302,20 @@ export const getOverdueOrders = async (
   const orders = await prisma.order.findMany({
     where: {
       tenantId,
+      deletedAt: null,
       isCreditOrder: true,
-      status: "DISPATCHED",
+      status: { in: [...DISPATCHED_ORDER_STATUSES] },
       dueDate: { lt: new Date() },
     },
-    orderBy: [{ dueDate: "asc" }, { id: "asc" }],
     include: ORDER_LIST_INCLUDE,
   });
 
-  return orders.map((order) => ({
-    ...withOrderComputedFields(order),
-    daysOverdue: getDaysOverdue(order.dueDate),
-  }));
+  return orders
+    .map((order) => ({
+      ...withOrderComputedFields(order),
+      daysOverdue: getDaysOverdue(order.dueDate),
+    }))
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
 };
 
 export const getDispatchSummary = async (
@@ -1316,6 +1329,7 @@ export const getDispatchSummary = async (
     where: {
       id: orderId,
       tenantId,
+      deletedAt: null,
     },
     include: ORDER_DETAILS_INCLUDE,
   });
@@ -1324,18 +1338,20 @@ export const getDispatchSummary = async (
     throw notFoundError("Order not found");
   }
 
-  const items = order.items.map((item) => ({
-    id: item.id,
-    designId: item.designId,
-    designCode: item.design.designCode,
-    designName: item.design.name,
-    category: item.design.category,
-    quantityDozens: item.quantityDozens,
-    dispatchedDozens: item.dispatchedDozens,
-    remainingDozens: getRemainingDozens(item),
-    pricePerDozen: item.pricePerDozen,
-    lineTotal: item.lineTotal,
-  }));
+  const items = order.dispatches.flatMap((dispatch) =>
+    dispatch.items.map((dispatchItem) => ({
+      dispatchId: dispatch.id,
+      dispatchedAt: dispatch.dispatchedAt,
+      transportMode: dispatch.transportMode,
+      trackingRef: dispatch.trackingRef,
+      designCode: dispatchItem.orderItem.design.designCode,
+      designName: dispatchItem.orderItem.design.name,
+      dispatchedDozens: dispatchItem.dozensDispatched,
+    })),
+  );
+
+  const latestDispatch =
+    order.dispatches.length > 0 ? order.dispatches[order.dispatches.length - 1] : null;
 
   return {
     order: {
@@ -1344,14 +1360,32 @@ export const getDispatchSummary = async (
       orderDate: order.orderDate,
       status: order.status,
       totalAmount: order.totalAmount,
-      transportMode: order.transportMode,
-      trackingRef: order.trackingRef,
-      dispatchedAt: order.dispatchedAt,
+      dispatchedAt: latestDispatch?.dispatchedAt ?? order.dispatchedAt,
     },
-    dealer: order.dealer,
+    dealer: {
+      name: order.dealer.name,
+      addressLine1: order.dealer.addressLine1,
+      addressLine2: order.dealer.addressLine2,
+      phone: order.dealer.phone,
+      city: order.dealer.city,
+    },
     items,
     totalDozensDispatched: items.reduce((sum, item) => sum + item.dispatchedDozens, 0),
     totalAmount: order.totalAmount,
-    dispatches: order.dispatches,
+    dispatches: order.dispatches.map((dispatch) => ({
+      id: dispatch.id,
+      transportMode: dispatch.transportMode,
+      trackingRef: dispatch.trackingRef,
+      dispatchedAt: dispatch.dispatchedAt,
+      dispatchedBy: dispatch.dispatchedBy,
+      items: dispatch.items.map((dispatchItem) => ({
+        id: dispatchItem.id,
+        orderItemId: dispatchItem.orderItemId,
+        inventoryStockId: dispatchItem.inventoryStockId,
+        dozensDispatched: dispatchItem.dozensDispatched,
+        designCode: dispatchItem.orderItem.design.designCode,
+        designName: dispatchItem.orderItem.design.name,
+      })),
+    })),
   };
 };
