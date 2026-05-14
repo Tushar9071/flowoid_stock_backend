@@ -37,6 +37,8 @@ const options: swaggerJsdoc.Options = {
       { name: "Goods Returns", description: "Batch returns of finished goods against worker assignments" },
       { name: "Inventory", description: "Finished goods stock, packaging batches, adjustments, and low stock alerts" },
       { name: "Orders", description: "Dealer orders, dispatches, packaged stock deduction, and sale ledger entries" },
+      { name: "Payments", description: "Dealer receipts, supplier payments, outstanding balances, aging, and cash flow" },
+      { name: "Documents", description: "PDF invoices, delivery challans, and payment receipts" },
     ],
     paths: {
       "/health": {
@@ -2249,6 +2251,160 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/payments": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Payments"],
+          summary: "List payments with filters and pagination",
+          parameters: [
+            { $ref: "#/components/parameters/PaymentPartyIdQueryParam" },
+            { $ref: "#/components/parameters/PaymentNatureQueryParam" },
+            { $ref: "#/components/parameters/PaymentMethodQueryParam" },
+            { $ref: "#/components/parameters/PaymentStatusQueryParam" },
+            { $ref: "#/components/parameters/PaymentDateFromQueryParam" },
+            { $ref: "#/components/parameters/PaymentDateToQueryParam" },
+            { $ref: "#/components/parameters/PaymentPageQueryParam" },
+            { $ref: "#/components/parameters/PaymentLimitQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/PaymentListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/aging-report": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Payments"],
+          summary: "Get dealer aging report from ledger and payment allocations",
+          parameters: [{ $ref: "#/components/parameters/PaymentAsOfDateQueryParam" }],
+          responses: {
+            200: { $ref: "#/components/responses/AgingReportSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/cashflow": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Payments"],
+          summary: "Get daily cash flow summary",
+          parameters: [{ $ref: "#/components/parameters/PaymentDateQueryParam" }],
+          responses: {
+            200: { $ref: "#/components/responses/DailyCashFlowSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/party/{partyId}/outstanding": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+        ],
+        get: {
+          tags: ["Payments"],
+          summary: "Get outstanding balance for a party from ledger entries",
+          responses: {
+            200: { $ref: "#/components/responses/OutstandingBalanceSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/dealer": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["Payments"],
+          summary: "Create a dealer receipt or dealer advance",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateDealerPaymentRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/PaymentSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/supplier": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["Payments"],
+          summary: "Create a supplier payment",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateSupplierPaymentRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/PaymentSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/{paymentId}/status": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PaymentIdPathParam" },
+        ],
+        patch: {
+          tags: ["Payments"],
+          summary: "Update payment status and create reversal ledger entries when needed",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdatePaymentStatusRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/PaymentSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/{paymentId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PaymentIdPathParam" },
+        ],
+        get: {
+          tags: ["Payments"],
+          summary: "Get payment details",
+          responses: {
+            200: { $ref: "#/components/responses/PaymentSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
     },
     components: {
       parameters: {
@@ -2286,6 +2442,73 @@ const options: swaggerJsdoc.Options = {
           required: true,
           schema: { type: "string", format: "uuid" },
           description: "Party ID",
+        },
+        PaymentIdPathParam: {
+          name: "paymentId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+          description: "Payment ID",
+        },
+        PaymentPartyIdQueryParam: {
+          name: "partyId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter payments by party ID",
+        },
+        PaymentNatureQueryParam: {
+          name: "paymentNature",
+          in: "query",
+          schema: { $ref: "#/components/schemas/PaymentNature" },
+          description: "Filter payments by payment nature",
+        },
+        PaymentMethodQueryParam: {
+          name: "paymentMethod",
+          in: "query",
+          schema: { $ref: "#/components/schemas/PaymentMethod" },
+          description: "Filter payments by payment method",
+        },
+        PaymentStatusQueryParam: {
+          name: "paymentStatus",
+          in: "query",
+          schema: { $ref: "#/components/schemas/PaymentStatus" },
+          description: "Filter payments by payment status",
+        },
+        PaymentDateFromQueryParam: {
+          name: "dateFrom",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include payments from this date-time onward",
+        },
+        PaymentDateToQueryParam: {
+          name: "dateTo",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include payments up to this date-time",
+        },
+        PaymentPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        PaymentLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
+        },
+        PaymentAsOfDateQueryParam: {
+          name: "asOfDate",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Calculate aging buckets as of this date-time",
+        },
+        PaymentDateQueryParam: {
+          name: "date",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Payment date to summarize",
         },
         PartyPageQueryParam: {
           name: "page",
@@ -3173,6 +3396,46 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/OrderDispatchSummaryResponse" },
+            },
+          },
+        },
+        PaymentSuccess: {
+          description: "Payment response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PaymentResponse" },
+            },
+          },
+        },
+        PaymentListSuccess: {
+          description: "Paginated payment list",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PaymentListResponse" },
+            },
+          },
+        },
+        OutstandingBalanceSuccess: {
+          description: "Outstanding balance response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OutstandingBalanceResponse" },
+            },
+          },
+        },
+        AgingReportSuccess: {
+          description: "Dealer aging report response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AgingReportResponse" },
+            },
+          },
+        },
+        DailyCashFlowSuccess: {
+          description: "Daily cash flow response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DailyCashFlowResponse" },
             },
           },
         },
@@ -5244,27 +5507,249 @@ const options: swaggerJsdoc.Options = {
             notes: { type: "string" },
           },
         },
+        PaymentNature: {
+          type: "string",
+          enum: ["DEALER_RECEIPT", "SUPPLIER_PAYMENT", "DEALER_ADVANCE", "SUPPLIER_ADVANCE"],
+        },
+        PaymentMethod: {
+          type: "string",
+          enum: ["CASH", "BANK_TRANSFER", "UPI", "CHEQUE", "OTHER"],
+        },
+        PaymentStatus: {
+          type: "string",
+          enum: ["PENDING", "CLEARED", "BOUNCED", "CANCELLED"],
+        },
+        DocumentType: {
+          type: "string",
+          enum: ["SALES_INVOICE", "DELIVERY_CHALLAN", "PAYMENT_RECEIPT", "PURCHASE_BILL"],
+        },
+        PaymentAllocation: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            paymentId: { type: "string", format: "uuid" },
+            orderId: { type: "string", format: "uuid" },
+            amount: { type: "string", example: "5000.00" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            order: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                orderNumber: { type: "string", example: "ORD-2026-0001" },
+                totalAmount: { type: "string", example: "11500.00" },
+                status: { $ref: "#/components/schemas/OrderStatus" },
+              },
+            },
+          },
+        },
         Payment: {
           type: "object",
           properties: {
             id: { type: "string", format: "uuid" },
-            paymentType: {
-              type: "string",
-              enum: [
-                "DEALER_PAYMENT",
-                "SUPPLIER_PAYMENT",
-                "WORKER_PAYMENT",
-                "DEALER_ADVANCE",
-                "WORKER_ADVANCE",
-              ],
+            tenantId: { type: "string", format: "uuid" },
+            partyId: { type: "string", format: "uuid" },
+            paymentNature: { $ref: "#/components/schemas/PaymentNature" },
+            paymentMethod: { $ref: "#/components/schemas/PaymentMethod" },
+            paymentStatus: { $ref: "#/components/schemas/PaymentStatus" },
+            amount: { type: "string", example: "5000.00" },
+            paymentDate: { type: "string", format: "date-time" },
+            referenceNumber: { type: "string", nullable: true, example: "UPI123456" },
+            bankName: { type: "string", nullable: true, example: "HDFC Bank" },
+            accountNumber: { type: "string", nullable: true },
+            notes: { type: "string", nullable: true },
+            recordedById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            party: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                type: { type: "string", enum: ["DEALER", "SUPPLIER"] },
+                name: { type: "string", example: "R K Jewellers" },
+                code: { type: "string", nullable: true },
+              },
             },
-            paymentMode: {
-              type: "string",
-              enum: ["CASH", "BANK_TRANSFER", "UPI"],
+            allocations: {
+              type: "array",
+              items: { $ref: "#/components/schemas/PaymentAllocation" },
             },
-            amount: { type: "string", example: "4800.00" },
-            isAdvance: { type: "boolean", example: false },
-            paidAt: { type: "string", format: "date-time" },
+          },
+        },
+        GeneratedDocument: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            documentType: { $ref: "#/components/schemas/DocumentType" },
+            referenceId: { type: "string", format: "uuid" },
+            referenceType: { type: "string", example: "ORDER" },
+            documentNumber: { type: "string", example: "INV-ORD-2026-0001" },
+            filePath: { type: "string", nullable: true },
+            fileSize: { type: "integer", nullable: true },
+            generatedAt: { type: "string", format: "date-time", nullable: true },
+            generatedById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        PaymentPagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalItems: { type: "integer", example: 1 },
+            totalPages: { type: "integer", example: 1 },
+            hasNextPage: { type: "boolean", example: false },
+            hasPreviousPage: { type: "boolean", example: false },
+          },
+        },
+        PaymentResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/Payment" },
+          },
+          required: ["success", "data"],
+        },
+        PaymentListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Payment" },
+                },
+                pagination: { $ref: "#/components/schemas/PaymentPagination" },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
+        OutstandingBalance: {
+          type: "object",
+          properties: {
+            party: { $ref: "#/components/schemas/Party" },
+            outstandingAmount: { type: "string", example: "6500.00" },
+            totalInvoiced: { type: "string", example: "11500.00" },
+            totalReceived: { type: "string", example: "5000.00" },
+            openingBalance: { type: "string", example: "0.00" },
+          },
+        },
+        OutstandingBalanceResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/OutstandingBalance" },
+          },
+          required: ["success", "data"],
+        },
+        AgingReport: {
+          type: "object",
+          properties: {
+            partyId: { type: "string", format: "uuid" },
+            name: { type: "string", example: "R K Jewellers" },
+            code: { type: "string", nullable: true },
+            totalOutstanding: { type: "string", example: "6500.00" },
+            buckets: {
+              type: "object",
+              properties: {
+                current: { type: "string", example: "0.00" },
+                days0To30: { type: "string", example: "6500.00" },
+                days31To60: { type: "string", example: "0.00" },
+                days61To90: { type: "string", example: "0.00" },
+                days90Plus: { type: "string", example: "0.00" },
+              },
+            },
+          },
+        },
+        AgingReportResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/AgingReport" },
+            },
+          },
+          required: ["success", "data"],
+        },
+        DailyCashFlow: {
+          type: "object",
+          properties: {
+            date: { type: "string", format: "date-time" },
+            totalReceived: { type: "string", example: "5000.00" },
+            totalPaidOut: { type: "string", example: "1200.00" },
+            netCashFlow: { type: "string", example: "3800.00" },
+            breakdownByMethod: { type: "object" },
+            transactions: {
+              type: "array",
+              items: { $ref: "#/components/schemas/Payment" },
+            },
+          },
+        },
+        DailyCashFlowResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/DailyCashFlow" },
+          },
+          required: ["success", "data"],
+        },
+        CreatePaymentAllocationRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["orderId", "amount"],
+          properties: {
+            orderId: { type: "string", format: "uuid" },
+            amount: { type: "number", exclusiveMinimum: 0, example: 5000 },
+          },
+        },
+        CreateDealerPaymentRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["partyId", "amount", "paymentMethod"],
+          properties: {
+            partyId: { type: "string", format: "uuid" },
+            amount: { type: "number", exclusiveMinimum: 0, example: 5000 },
+            paymentMethod: { $ref: "#/components/schemas/PaymentMethod" },
+            paymentDate: { type: "string", format: "date-time" },
+            referenceNumber: { type: "string", example: "UPI123456" },
+            bankName: { type: "string", example: "HDFC Bank" },
+            accountNumber: { type: "string" },
+            notes: { type: "string" },
+            allocations: {
+              type: "array",
+              items: { $ref: "#/components/schemas/CreatePaymentAllocationRequest" },
+            },
+          },
+        },
+        CreateSupplierPaymentRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["partyId", "amount", "paymentMethod"],
+          properties: {
+            partyId: { type: "string", format: "uuid" },
+            amount: { type: "number", exclusiveMinimum: 0, example: 2500 },
+            paymentMethod: { $ref: "#/components/schemas/PaymentMethod" },
+            paymentDate: { type: "string", format: "date-time" },
+            referenceNumber: { type: "string", example: "CHQ1024" },
+            bankName: { type: "string", example: "HDFC Bank" },
+            accountNumber: { type: "string" },
+            notes: { type: "string" },
+          },
+        },
+        UpdatePaymentStatusRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["paymentStatus"],
+          properties: {
+            paymentStatus: { $ref: "#/components/schemas/PaymentStatus" },
+            notes: { type: "string", example: "Cheque bounced" },
           },
         },
         Assignment: {

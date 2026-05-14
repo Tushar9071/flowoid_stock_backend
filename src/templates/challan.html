@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Delivery Challan</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #1f2937; margin: 0; font-size: 12px; }
+      .header { border-bottom: 2px solid #1f2937; padding-bottom: 16px; display: flex; justify-content: space-between; }
+      h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: 0; }
+      h2 { margin: 0 0 8px; font-size: 18px; text-align: right; }
+      .muted { color: #667085; line-height: 1.5; }
+      .meta { text-align: right; line-height: 1.7; }
+      .section { margin-top: 22px; }
+      .box { border: 1px solid #d0d5dd; padding: 12px; }
+      .box-title { font-weight: bold; text-transform: uppercase; color: #667085; font-size: 11px; margin-bottom: 6px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th { background: #f2f4f7; border-bottom: 1px solid #d0d5dd; text-align: left; padding: 9px 8px; }
+      td { border-bottom: 1px solid #eaecf0; padding: 9px 8px; }
+      .right { text-align: right; }
+      .transport { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 20px; }
+      .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 70px; }
+      .signature { border-top: 1px solid #1f2937; padding-top: 8px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div>
+        <h1>{{tenant.name}}</h1>
+        <div class="muted">{{tenant.address}}</div>
+      </div>
+      <div class="meta">
+        <h2>Delivery Challan</h2>
+        <div><strong>Challan No:</strong> {{challanNumber}}</div>
+        <div><strong>Date:</strong> {{challanDate}}</div>
+      </div>
+    </div>
+
+    <div class="section box">
+      <div class="box-title">Deliver To</div>
+      <strong>{{dealer.name}}</strong><br />
+      {{dealer.address}}<br />
+      {{dealer.city}}
+    </div>
+
+    <div class="section">
+      <table>
+        <thead>
+          <tr>
+            <th>Design Code</th>
+            <th>Design Name</th>
+            <th class="right">Dozens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{designCode}}</td>
+            <td>{{designName}}</td>
+            <td class="right">{{dozens}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      <table>
+        <tr>
+          <td><strong>Total Dozens</strong></td>
+          <td class="right"><strong>{{totalDozens}}</strong></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="transport">
+      <div class="box"><strong>Transport Mode:</strong> {{transportMode}}</div>
+      <div class="box"><strong>Tracking Reference:</strong> {{trackingRef}}</div>
+    </div>
+
+    <div class="signatures">
+      <div class="signature">Dispatched by</div>
+      <div class="signature">Received by</div>
+    </div>
+  </body>
+</html>

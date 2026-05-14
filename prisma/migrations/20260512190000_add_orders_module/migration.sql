@@ -18,8 +18,6 @@ CREATE TABLE "orders" (
     "confirmedAt" TIMESTAMP(3),
     "packedAt" TIMESTAMP(3),
     "dispatchedAt" TIMESTAMP(3),
-    "transportMode" TEXT,
-    "trackingRef" TEXT,
     "cancelledAt" TIMESTAMP(3),
     "cancelReason" TEXT,
     "deletedAt" TIMESTAMP(3),
@@ -69,7 +67,6 @@ CREATE TABLE "order_dispatch_items" (
     "dispatchId" TEXT NOT NULL,
     "orderItemId" TEXT NOT NULL,
     "inventoryStockId" TEXT NOT NULL,
-    "designId" TEXT NOT NULL,
     "dozensDispatched" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -155,5 +152,3 @@ ALTER TABLE "order_dispatch_items" ADD CONSTRAINT "order_dispatch_items_orderIte
 -- AddForeignKey
 ALTER TABLE "order_dispatch_items" ADD CONSTRAINT "order_dispatch_items_inventoryStockId_fkey" FOREIGN KEY ("inventoryStockId") REFERENCES "inventory_stocks"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "order_dispatch_items" ADD CONSTRAINT "order_dispatch_items_designId_fkey" FOREIGN KEY ("designId") REFERENCES "designs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

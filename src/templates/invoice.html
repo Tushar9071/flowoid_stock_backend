@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sales Invoice</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #172033; margin: 0; font-size: 12px; }
+      .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #172033; padding-bottom: 18px; }
+      .brand { display: flex; gap: 14px; align-items: flex-start; }
+      .logo { width: 64px; height: 64px; border: 1px solid #ccd3df; display: flex; align-items: center; justify-content: center; color: #697386; font-size: 10px; text-align: center; }
+      h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: 0; }
+      h2 { font-size: 18px; margin: 0 0 8px; text-align: right; }
+      .muted { color: #5f6b7a; line-height: 1.5; }
+      .meta { text-align: right; line-height: 1.7; }
+      .section { margin-top: 22px; }
+      .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .box-title { font-weight: bold; text-transform: uppercase; font-size: 11px; color: #5f6b7a; margin-bottom: 7px; }
+      .party { border: 1px solid #d7dde8; padding: 12px; min-height: 96px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th { background: #172033; color: #ffffff; text-align: left; padding: 9px 8px; font-size: 11px; }
+      td { border-bottom: 1px solid #e3e7ef; padding: 9px 8px; vertical-align: top; }
+      .right { text-align: right; }
+      .totals { width: 280px; margin-left: auto; margin-top: 14px; }
+      .totals td { border: 0; padding: 6px 8px; }
+      .grand td { border-top: 2px solid #172033; font-size: 14px; font-weight: bold; }
+      .terms { margin-top: 22px; border-top: 1px solid #d7dde8; padding-top: 14px; display: flex; justify-content: space-between; }
+      .footer { margin-top: 42px; text-align: center; color: #5f6b7a; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="brand">
+        <div class="logo">Business<br />Logo</div>
+        <div>
+          <h1>{{tenant.name}}</h1>
+          <div class="muted">
+            {{tenant.address}}<br />
+            {{tenant.phone}} {{tenant.email}}
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <h2>Sales Invoice</h2>
+        <div><strong>Invoice No:</strong> {{invoiceNumber}}</div>
+        <div><strong>Date:</strong> {{invoiceDate}}</div>
+      </div>
+    </div>
+
+    <div class="section two-col">
+      <div class="party">
+        <div class="box-title">Bill To</div>
+        <strong>{{dealer.name}}</strong><br />
+        {{dealer.address}}<br />
+        {{dealer.city}}<br />
+        GSTIN: {{dealer.gstin}}
+      </div>
+      <div class="party">
+        <div class="box-title">Payment Terms</div>
+        <strong>{{paymentTerms}}</strong><br />
+        {{#if dueDate}}Due Date: {{dueDate}}{{/if}}
+      </div>
+    </div>
+
+    <div class="section">
+      <table>
+        <thead>
+          <tr>
+            <th>Design Code</th>
+            <th>Design Name</th>
+            <th class="right">Qty (Dozens)</th>
+            <th class="right">Price/Dozen</th>
+            <th class="right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{designCode}}</td>
+            <td>{{designName}}</td>
+            <td class="right">{{quantityDozens}}</td>
+            <td class="right">{{pricePerDozen}}</td>
+            <td class="right">{{lineTotal}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <table class="totals">
+      <tr><td>Subtotal</td><td class="right">{{subtotalAmount}}</td></tr>
+      <tr><td>Discount</td><td class="right">{{discountAmount}}</td></tr>
+      <tr class="grand"><td>Grand Total</td><td class="right">{{totalAmount}}</td></tr>
+    </table>
+
+    <div class="terms">
+      <div>Order No: <strong>{{orderNumber}}</strong></div>
+      <div>{{#if isCreditOrder}}Credit invoice{{else}}Cash invoice{{/if}}</div>
+    </div>
+
+    <div class="footer">Thank you for your business</div>
+  </body>
+</html>

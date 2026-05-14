@@ -33,6 +33,8 @@ model User {
   inventoryAdjustments          InventoryAdjustment[]
   createdOrders                 Order[]
   orderDispatches               OrderDispatch[]
+  recordedPayments    Payment[]
+  generatedDocuments  GeneratedDocument[]
 
   @@map("users")
 }
@@ -108,6 +110,28 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING     // recorded but not yet cleared (e.g. cheque not cleared)
+  CLEARED     // confirmed payment
+  BOUNCED     // cheque bounced or transfer failed
+  CANCELLED   // payment entry cancelled
+}
+
+enum PaymentNature {
+  DEALER_RECEIPT    // money received FROM dealer against order
+  SUPPLIER_PAYMENT  // money paid TO supplier against purchase
+  DEALER_ADVANCE    // advance received from dealer before order
+  SUPPLIER_ADVANCE  // advance paid to supplier before purchase
+}
+
 model Tenant {
   id                 String       @id @default(uuid())
   name               String
@@ -144,6 +168,9 @@ model Tenant {
   orderItems                 OrderItem[]
   orderDispatches            OrderDispatch[]
   orderDispatchItems         OrderDispatchItem[]
+  payments            Payment[]
+  paymentAllocations  PaymentAllocation[]
+  generatedDocuments  GeneratedDocument[]
 
   @@map("tenants")
 }
@@ -180,6 +207,7 @@ model Party {
   ledgerEntries        PartyLedgerEntry[]
   rawMaterialPurchases RawMaterialPurchase[]
   orders               Order[]
+  payments       Payment[]
 
   @@index([tenantId, type, isActive])
   @@index([tenantId, name])
@@ -279,6 +307,8 @@ model PartyLedgerEntry {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
+  payment    Payment?  @relation(fields: [paymentId], references: [id])
+  paymentId  String?   @unique
   @@index([tenantId, entryDate])
   @@index([partyId, entryDate])
   @@index([partyId, entryType])
@@ -757,7 +787,7 @@ model Order {
 
   items      OrderItem[]
   dispatches OrderDispatch[]
-
+  payments       PaymentAllocation[]
   @@unique([tenantId, orderNumber])
   @@index([tenantId, dealerId])
   @@index([tenantId, status])
@@ -829,4 +859,116 @@ model OrderDispatchItem {
   @@index([tenantId, orderItemId])
   @@index([tenantId, inventoryStockId])
   @@map("order_dispatch_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENTS MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id          String        @id @default(uuid())
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+
+  // Which party is this payment with
+  party       Party         @relation(fields: [partyId], references: [id])
+  partyId     String
+
+  paymentNature  PaymentNature
+  paymentMethod  PaymentMethod
+  paymentStatus  PaymentStatus  @default(CLEARED)
+
+  amount         Decimal        @db.Decimal(18, 2)
+  paymentDate    DateTime       @default(now())
+
+  // Reference number — cheque number, UTR, UPI transaction ID etc.
+  referenceNumber String?
+
+  // Bank details — relevant for cheque/transfer
+  bankName        String?
+  accountNumber   String?
+
+  notes           String?
+  deletedAt       DateTime?
+
+  recordedBy      User           @relation(fields: [recordedById], references: [id])
+  recordedById    String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  allocations     PaymentAllocation[]  // which invoices this payment is allocated to
+  ledgerEntry     PartyLedgerEntry?    // the ledger entry created for this payment
+
+  @@index([tenantId, partyId])
+  @@index([tenantId, paymentNature])
+  @@index([tenantId, paymentDate])
+  @@index([tenantId, paymentStatus])
+  @@map("payments")
+}
+
+// Allocates a payment against specific order(s)
+// One payment can be split across multiple orders (e.g. dealer pays for 3 invoices at once)
+// One order can receive payments from multiple payment records (partial payments)
+model PaymentAllocation {
+  id          String   @id @default(uuid())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId    String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId   String
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderId     String
+  amount      Decimal  @db.Decimal(18, 2)  // how much of this payment goes to this order
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([paymentId, orderId])  // one allocation per payment-order pair
+  @@index([tenantId, paymentId])
+  @@index([tenantId, orderId])
+  @@map("payment_allocations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED DOCUMENTS (Invoices, Challans, Receipts)
+// Stores metadata about generated PDF documents
+// Actual PDF is generated on demand — URL stored here after first generation
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DocumentType {
+  SALES_INVOICE
+  DELIVERY_CHALLAN
+  PAYMENT_RECEIPT
+  PURCHASE_BILL
+}
+
+model GeneratedDocument {
+  id           String       @id @default(uuid())
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId     String
+  documentType DocumentType
+
+  // Polymorphic reference — which record this document belongs to
+  // e.g. SALES_INVOICE → orderId, PAYMENT_RECEIPT → paymentId
+  referenceId   String      // the id of the source record
+  referenceType String      // "ORDER", "PAYMENT", "PURCHASE"
+
+  // Document number shown on the PDF — e.g. "INV-2025-0001"
+  documentNumber String
+
+  // File storage — null until first generated
+  // When generated on demand, store the path/URL here
+  filePath      String?     // local path or cloud storage URL
+  fileSize      Int?        // bytes
+
+  generatedAt   DateTime?
+  generatedBy   User        @relation(fields: [generatedById], references: [id])
+  generatedById String
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([tenantId, documentNumber])
+  @@index([tenantId, referenceId, referenceType])
+  @@index([tenantId, documentType])
+  @@map("generated_documents")
 }

@@ -23,6 +23,8 @@ import workersRoutes from "./modules/workers/workers.routes";
 import assignmentsRoutes from "./modules/assignments/assignments.routes";
 import inventoryRoutes from "./modules/inventory/inventory.routes";
 import ordersRoutes from "./modules/orders/orders.routes";
+import paymentsRoutes from "./modules/payments/payments.routes";
+import documentsRoutes from "./modules/documents/documents.routes";
 
 
 
@@ -79,6 +81,8 @@ app.use("/api/tenants/:tenantId/workers", workersRoutes);
 app.use("/api/tenants/:tenantId/assignments", assignmentsRoutes);
 app.use("/api/tenants/:tenantId/inventory", inventoryRoutes);
 app.use("/api/tenants/:tenantId/orders", ordersRoutes);
+app.use("/api/tenants/:tenantId/payments", paymentsRoutes);
+app.use("/api/tenants/:tenantId/documents", documentsRoutes);
 
 // Global error handler - always last
 app.use(errorHandler);
