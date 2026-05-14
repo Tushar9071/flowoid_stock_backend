@@ -1,13 +1,16 @@
-import cors from "cors";
-import cookieParser from "cookie-parser";
 import express from "express";
 import type { Application } from "express";
-import helmet from "helmet";
-import swaggerUi from "swagger-ui-express";
 
+import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger";
+
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
+
 import { errorHandler } from "./middleware/error.middleware";
 import { collectApiMetrics } from "./middleware/metrics.middleware";
+
 //all routes import statement here
 import authRoutes from "./modules/auth/auth.routes";
 import roleRoutes from "./modules/role/role.routes";

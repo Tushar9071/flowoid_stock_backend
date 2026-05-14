@@ -2251,6 +2251,258 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/orders": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Orders"],
+          summary: "List tenant orders with filters and pagination",
+          parameters: [
+            { $ref: "#/components/parameters/OrderDealerIdQueryParam" },
+            { $ref: "#/components/parameters/OrderStatusQueryParam" },
+            { $ref: "#/components/parameters/OrderIsCreditOrderQueryParam" },
+            { $ref: "#/components/parameters/OrderIsOverdueQueryParam" },
+            { $ref: "#/components/parameters/OrderDateFromQueryParam" },
+            { $ref: "#/components/parameters/OrderDateToQueryParam" },
+            { $ref: "#/components/parameters/OrderSearchQueryParam" },
+            { $ref: "#/components/parameters/OrderPageQueryParam" },
+            { $ref: "#/components/parameters/OrderLimitQueryParam" },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/OrderListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+        post: {
+          tags: ["Orders"],
+          summary: "Create a draft order",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateOrderRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/overdue": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Orders"],
+          summary: "List overdue dispatched credit orders",
+          responses: {
+            200: { $ref: "#/components/responses/OverdueOrderListSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/dispatch-summary": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        get: {
+          tags: ["Orders"],
+          summary: "Get a printable dispatch summary for an order",
+          responses: {
+            200: { $ref: "#/components/responses/OrderDispatchSummarySuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        get: {
+          tags: ["Orders"],
+          summary: "Get a single order with full details",
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        patch: {
+          tags: ["Orders"],
+          summary: "Update a draft order",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateOrderRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/confirm": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        patch: {
+          tags: ["Orders"],
+          summary: "Confirm an order after stock validation",
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/pack": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        patch: {
+          tags: ["Orders"],
+          summary: "Mark a confirmed order as packed",
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/dispatch": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        patch: {
+          tags: ["Orders"],
+          summary: "Dispatch an order and deduct packaged stock",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DispatchOrderRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/cancel": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        patch: {
+          tags: ["Orders"],
+          summary: "Cancel an order before full dispatch",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CancelOrderRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/items": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        post: {
+          tags: ["Orders"],
+          summary: "Add a line item to a draft order",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AddOrderItemRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/orders/{orderId}/items/{itemId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+          { $ref: "#/components/parameters/OrderItemIdPathParam" },
+        ],
+        patch: {
+          tags: ["Orders"],
+          summary: "Update a line item in a draft order",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateOrderItemRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        delete: {
+          tags: ["Orders"],
+          summary: "Remove a line item from a draft order",
+          responses: {
+            200: { $ref: "#/components/responses/OrderSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
       "/api/tenants/{tenantId}/payments": {
         parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
         get: {
@@ -2405,6 +2657,57 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/documents/orders/{orderId}/invoice": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        get: {
+          tags: ["Documents"],
+          summary: "Generate sales invoice PDF for an order",
+          responses: {
+            200: { $ref: "#/components/responses/PdfFileSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/documents/orders/{orderId}/challan": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        get: {
+          tags: ["Documents"],
+          summary: "Generate delivery challan PDF for an order",
+          responses: {
+            200: { $ref: "#/components/responses/PdfFileSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/documents/payments/{paymentId}/receipt": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PaymentIdPathParam" },
+        ],
+        get: {
+          tags: ["Documents"],
+          summary: "Generate payment receipt PDF",
+          responses: {
+            200: { $ref: "#/components/responses/PdfFileSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
     },
     components: {
       parameters: {
@@ -2435,6 +2738,60 @@ const options: swaggerJsdoc.Options = {
           required: true,
           schema: { type: "string", format: "uuid" },
           description: "Order item ID",
+        },
+        OrderDealerIdQueryParam: {
+          name: "dealerId",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Filter orders by dealer ID",
+        },
+        OrderStatusQueryParam: {
+          name: "status",
+          in: "query",
+          schema: { $ref: "#/components/schemas/OrderStatus" },
+          description: "Filter orders by status",
+        },
+        OrderIsCreditOrderQueryParam: {
+          name: "isCreditOrder",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter credit or cash orders",
+        },
+        OrderIsOverdueQueryParam: {
+          name: "isOverdue",
+          in: "query",
+          schema: { type: "boolean" },
+          description: "Filter overdue dispatched credit orders",
+        },
+        OrderDateFromQueryParam: {
+          name: "dateFrom",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include orders from this date-time onward",
+        },
+        OrderDateToQueryParam: {
+          name: "dateTo",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Include orders up to this date-time",
+        },
+        OrderSearchQueryParam: {
+          name: "search",
+          in: "query",
+          schema: { type: "string" },
+          description: "Search by order number or dealer details",
+        },
+        OrderPageQueryParam: {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+          description: "Page number",
+        },
+        OrderLimitQueryParam: {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          description: "Number of records per page",
         },
         PartyIdPathParam: {
           name: "partyId",
@@ -3436,6 +3793,17 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/DailyCashFlowResponse" },
+            },
+          },
+        },
+        PdfFileSuccess: {
+          description: "PDF file",
+          content: {
+            "application/pdf": {
+              schema: {
+                type: "string",
+                format: "binary",
+              },
             },
           },
         },
