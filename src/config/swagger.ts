@@ -2251,6 +2251,311 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/inventory/stock": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Inventory"],
+          summary: "List finished goods stock overview",
+          description:
+            "Returns paginated finished goods inventory by design. Stock is recalculated from goods returns, packaging batches, inventory adjustments, and dispatched order items before returning.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, default: 1 },
+              description: "Page number",
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+              description: "Number of records per page",
+            },
+            {
+              name: "designId",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+              description: "Filter stock overview by design ID",
+            },
+            {
+              name: "categoryId",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+              description: "Filter stock overview by design category ID",
+            },
+            {
+              name: "isLow",
+              in: "query",
+              schema: { type: "boolean" },
+              description:
+                "Filter low-stock rows. A row is low when lowStockAlertAt is greater than 0 and packagedDozens is below that threshold.",
+            },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/InventoryStockListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/inventory/stock/alerts": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["Inventory"],
+          summary: "List low stock alerts",
+          description:
+            "Returns designs where packaged dozens are below the configured lowStockAlertAt threshold. Results are sorted by highest deficit first.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/InventoryLowStockAlertListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/inventory/stock/{designId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          {
+            name: "designId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Design ID",
+          },
+        ],
+        get: {
+          tags: ["Inventory"],
+          summary: "Get stock by design",
+          description:
+            "Returns the current stock row for one design plus its packaging batch history.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/InventoryStockDetailSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/inventory/stock/{designId}/alert": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          {
+            name: "designId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Design ID",
+          },
+        ],
+        patch: {
+          tags: ["Inventory"],
+          summary: "Update low stock alert threshold",
+          description:
+            "Sets the packaged-dozen threshold used to mark this design as low stock. Use 0 to disable alerts for the design.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateInventoryLowStockAlertRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/InventoryStockSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/inventory/stock/{designId}/adjustment": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          {
+            name: "designId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Design ID",
+          },
+        ],
+        post: {
+          tags: ["Inventory"],
+          summary: "Create inventory stock adjustment",
+          description:
+            "Creates a manual stock adjustment for unpackaged pieces or packaged dozens, then returns the adjustment and refreshed stock. Negative adjustments are blocked if they would make stock negative.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreateInventoryAdjustmentRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/InventoryAdjustmentCreateSuccess" },
+            400: {
+              description: "Adjustment failed validation or would make stock negative",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    unpackagedNegative: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Adjustment would make unpackaged stock negative. Available: 8 pieces",
+                          details: null,
+                        },
+                      },
+                    },
+                    packagedNegative: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Adjustment would make packaged stock negative. Available: 2 dozens",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/inventory/packaging": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["Inventory"],
+          summary: "Create packaging batch",
+          description:
+            "Converts unpackaged pieces into packaged dozens for a design. Each dozen consumes 12 unpackaged pieces.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CreatePackagingBatchRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/PackagingBatchCreateSuccess" },
+            400: {
+              description: "Packaging failed validation or has insufficient unpackaged stock",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ErrorResponse" },
+                  examples: {
+                    insufficientStock: {
+                      value: {
+                        success: false,
+                        error: {
+                          code: "VALIDATION_ERROR",
+                          message: "Insufficient unpackaged stock. Available: 20 pieces, Required: 36 pieces",
+                          details: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+        get: {
+          tags: ["Inventory"],
+          summary: "List packaging batches",
+          description:
+            "Returns packaging batches with design and packed-by user details. Supports filtering by design and packed date range.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, default: 1 },
+              description: "Page number",
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+              description: "Number of records per page",
+            },
+            {
+              name: "designId",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+              description: "Filter packaging batches by design ID",
+            },
+            {
+              name: "dateFrom",
+              in: "query",
+              schema: { type: "string", format: "date-time" },
+              description: "Include packaging batches from this date-time onward",
+            },
+            {
+              name: "dateTo",
+              in: "query",
+              schema: { type: "string", format: "date-time" },
+              description: "Include packaging batches up to this date-time",
+            },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/PackagingBatchListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/inventory/packaging/{batchId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          {
+            name: "batchId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Packaging batch ID",
+          },
+        ],
+        get: {
+          tags: ["Inventory"],
+          summary: "Get packaging batch by ID",
+          description: "Returns one packaging batch with design and packed-by user details.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { $ref: "#/components/responses/PackagingBatchSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
       "/api/tenants/{tenantId}/orders": {
         parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
         get: {
