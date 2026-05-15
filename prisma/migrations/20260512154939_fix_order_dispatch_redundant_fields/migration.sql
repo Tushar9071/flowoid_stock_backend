@@ -1,4 +1,0 @@
--- This migration was originally generated before the orders tables existed,
--- which made fresh migration replays fail on the shadow database.
--- The final orders table shape is now created directly in
--- 20260512190000_add_orders_module, so this migration is intentionally empty.
