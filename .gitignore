@@ -146,3 +146,7 @@ dist
 .claude
 /generated/prisma
 *.dump
+
+
+/prisma/migrations
+/tmp/
