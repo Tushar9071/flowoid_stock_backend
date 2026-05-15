@@ -1,3 +1,5 @@
+import fs from "fs/promises";
+import path from "path";
 import { Prisma } from "@prisma/client";
 
 import {
@@ -21,6 +23,9 @@ type DocumentResult = {
   documentNumber: string;
 };
 
+type DocumentType = "SALES_INVOICE" | "DELIVERY_CHALLAN" | "PAYMENT_RECEIPT";
+type ReferenceType = "ORDER" | "PAYMENT";
+
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : "Unknown error";
 
@@ -28,6 +33,39 @@ const documentGenerationError = (
   message: string,
   details?: Record<string, unknown>,
 ): AppError => new AppError(500, message, "DOCUMENT_GENERATION_FAILED", details);
+
+const getDocumentStorageRoot = (): string =>
+  process.env.DOCUMENT_STORAGE_DIR ||
+  path.join(process.cwd(), "storage", "generated-documents");
+
+const safeFileName = (fileName: string): string =>
+  fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+const saveGeneratedDocumentPdf = async (input: {
+  tenantId: string;
+  documentType: DocumentType;
+  fileName: string;
+  pdfBuffer: Buffer;
+}): Promise<string> => {
+  const directory = path.join(
+    getDocumentStorageRoot(),
+    input.tenantId,
+    input.documentType.toLowerCase(),
+  );
+  const filePath = path.join(directory, safeFileName(input.fileName));
+
+  try {
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(filePath, input.pdfBuffer);
+    return filePath;
+  } catch (error) {
+    throw documentGenerationError("PDF was generated but could not be saved locally", {
+      documentType: input.documentType,
+      filePath,
+      reason: getErrorMessage(error),
+    });
+  }
+};
 
 const money = (value: Prisma.Decimal | number | null | undefined): string => {
   const decimal =
@@ -158,11 +196,12 @@ const amountToWords = (amount: Prisma.Decimal): string => {
 
 const recordGeneratedDocument = async (input: {
   tenantId: string;
-  documentType: "SALES_INVOICE" | "DELIVERY_CHALLAN" | "PAYMENT_RECEIPT";
+  documentType: DocumentType;
   referenceId: string;
-  referenceType: "ORDER" | "PAYMENT";
+  referenceType: ReferenceType;
   documentNumber: string;
   generatedById: string;
+  filePath: string;
   fileSize: number;
 }) => {
   try {
@@ -181,6 +220,7 @@ const recordGeneratedDocument = async (input: {
         where: { id: existing.id },
         data: {
           documentNumber: input.documentNumber,
+          filePath: input.filePath,
           fileSize: input.fileSize,
           generatedAt: new Date(),
           generatedById: input.generatedById,
@@ -195,6 +235,7 @@ const recordGeneratedDocument = async (input: {
         referenceId: input.referenceId,
         referenceType: input.referenceType,
         documentNumber: input.documentNumber,
+        filePath: input.filePath,
         fileSize: input.fileSize,
         generatedAt: new Date(),
         generatedById: input.generatedById,
@@ -209,9 +250,39 @@ const recordGeneratedDocument = async (input: {
       documentType: input.documentType,
       referenceType: input.referenceType,
       referenceId: input.referenceId,
+      filePath: input.filePath,
       reason: getErrorMessage(error),
     });
   }
+};
+
+const persistGeneratedDocument = async (input: {
+  tenantId: string;
+  documentType: DocumentType;
+  referenceId: string;
+  referenceType: ReferenceType;
+  documentNumber: string;
+  generatedById: string;
+  fileName: string;
+  pdfBuffer: Buffer;
+}) => {
+  const filePath = await saveGeneratedDocumentPdf({
+    tenantId: input.tenantId,
+    documentType: input.documentType,
+    fileName: input.fileName,
+    pdfBuffer: input.pdfBuffer,
+  });
+
+  await recordGeneratedDocument({
+    tenantId: input.tenantId,
+    documentType: input.documentType,
+    referenceId: input.referenceId,
+    referenceType: input.referenceType,
+    documentNumber: input.documentNumber,
+    generatedById: input.generatedById,
+    filePath,
+    fileSize: input.pdfBuffer.length,
+  });
 };
 
 const generateDocumentPdf = async (
@@ -333,19 +404,21 @@ export const generateInvoice = async (
     totalAmount: money(order.totalAmount),
   });
 
-  await recordGeneratedDocument({
+  const fileName = `${documentNumber}.pdf`;
+  await persistGeneratedDocument({
     tenantId,
     documentType: "SALES_INVOICE",
     referenceId: order.id,
     referenceType: "ORDER",
     documentNumber,
     generatedById,
-    fileSize: pdfBuffer.length,
+    fileName,
+    pdfBuffer,
   });
 
   return {
     pdfBuffer,
-    fileName: `${documentNumber}.pdf`,
+    fileName,
     documentNumber,
   };
 };
@@ -391,19 +464,21 @@ export const generateChallan = async (
     trackingRef: latestDispatch.trackingRef ?? "-",
   });
 
-  await recordGeneratedDocument({
+  const fileName = `${documentNumber}.pdf`;
+  await persistGeneratedDocument({
     tenantId,
     documentType: "DELIVERY_CHALLAN",
     referenceId: order.id,
     referenceType: "ORDER",
     documentNumber,
     generatedById,
-    fileSize: pdfBuffer.length,
+    fileName,
+    pdfBuffer,
   });
 
   return {
     pdfBuffer,
-    fileName: `${documentNumber}.pdf`,
+    fileName,
     documentNumber,
   };
 };
@@ -467,19 +542,21 @@ export const generatePaymentReceipt = async (
         : [{ orderNumber: "Advance / Unallocated", amount: money(payment.amount) }],
   });
 
-  await recordGeneratedDocument({
+  const fileName = `${documentNumber}.pdf`;
+  await persistGeneratedDocument({
     tenantId,
     documentType: "PAYMENT_RECEIPT",
     referenceId: payment.id,
     referenceType: "PAYMENT",
     documentNumber,
     generatedById,
-    fileSize: pdfBuffer.length,
+    fileName,
+    pdfBuffer,
   });
 
   return {
     pdfBuffer,
-    fileName: `${documentNumber}.pdf`,
+    fileName,
     documentNumber,
   };
 };
