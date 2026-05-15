@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
 
 import {
+  AppError,
   forbiddenError,
+  isAppError,
   notFoundError,
   validationError,
 } from "../../common/errors/app-error";
@@ -18,6 +20,14 @@ type DocumentResult = {
   fileName: string;
   documentNumber: string;
 };
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : "Unknown error";
+
+const documentGenerationError = (
+  message: string,
+  details?: Record<string, unknown>,
+): AppError => new AppError(500, message, "DOCUMENT_GENERATION_FAILED", details);
 
 const money = (value: Prisma.Decimal | number | null | undefined): string => {
   const decimal =
@@ -155,40 +165,78 @@ const recordGeneratedDocument = async (input: {
   generatedById: string;
   fileSize: number;
 }) => {
-  const existing = await prisma.generatedDocument.findFirst({
-    where: {
-      tenantId: input.tenantId,
-      documentType: input.documentType,
-      referenceId: input.referenceId,
-      referenceType: input.referenceType,
-    },
-    select: { id: true },
-  });
+  try {
+    const existing = await prisma.generatedDocument.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        documentType: input.documentType,
+        referenceId: input.referenceId,
+        referenceType: input.referenceType,
+      },
+      select: { id: true },
+    });
 
-  if (existing) {
-    return prisma.generatedDocument.update({
-      where: { id: existing.id },
+    if (existing) {
+      return prisma.generatedDocument.update({
+        where: { id: existing.id },
+        data: {
+          documentNumber: input.documentNumber,
+          fileSize: input.fileSize,
+          generatedAt: new Date(),
+          generatedById: input.generatedById,
+        },
+      });
+    }
+
+    return prisma.generatedDocument.create({
       data: {
+        tenantId: input.tenantId,
+        documentType: input.documentType,
+        referenceId: input.referenceId,
+        referenceType: input.referenceType,
         documentNumber: input.documentNumber,
         fileSize: input.fileSize,
         generatedAt: new Date(),
         generatedById: input.generatedById,
       },
     });
-  }
+  } catch (error) {
+    if (isAppError(error)) {
+      throw error;
+    }
 
-  return prisma.generatedDocument.create({
-    data: {
-      tenantId: input.tenantId,
+    throw documentGenerationError("Document was generated but metadata could not be saved", {
       documentType: input.documentType,
-      referenceId: input.referenceId,
       referenceType: input.referenceType,
-      documentNumber: input.documentNumber,
-      fileSize: input.fileSize,
-      generatedAt: new Date(),
-      generatedById: input.generatedById,
-    },
-  });
+      referenceId: input.referenceId,
+      reason: getErrorMessage(error),
+    });
+  }
+};
+
+const generateDocumentPdf = async (
+  templateName: "invoice" | "challan" | "paymentReceipt",
+  data: Record<string, unknown>,
+): Promise<Buffer> => {
+  try {
+    return await generatePdfBuffer(templateName, data);
+  } catch (error) {
+    if (isAppError(error)) {
+      throw error;
+    }
+
+    const displayName =
+      templateName === "paymentReceipt"
+        ? "payment receipt"
+        : templateName === "invoice"
+          ? "sales invoice"
+          : "delivery challan";
+
+    throw documentGenerationError(`Failed to generate ${displayName} PDF`, {
+      template: templateName,
+      reason: getErrorMessage(error),
+    });
+  }
 };
 
 const getOrderForDocument = async (tenantId: string, orderId: string) => {
@@ -254,7 +302,7 @@ export const generateInvoice = async (
   await assertTenantAccess(tenantId, currentUser);
   const order = await getOrderForDocument(tenantId, orderId);
   const documentNumber = `INV-${order.orderNumber}`;
-  const pdfBuffer = await generatePdfBuffer("invoice", {
+  const pdfBuffer = await generateDocumentPdf("invoice", {
     tenant: {
       name: order.tenant.name,
       address: joinAddress(order.tenant),
@@ -325,7 +373,7 @@ export const generateChallan = async (
   );
   const totalDozens = items.reduce((sum, item) => sum + item.dozens, 0);
   const documentNumber = `CH-${order.orderNumber}`;
-  const pdfBuffer = await generatePdfBuffer("challan", {
+  const pdfBuffer = await generateDocumentPdf("challan", {
     tenant: {
       name: order.tenant.name,
       address: joinAddress(order.tenant),
@@ -391,8 +439,12 @@ export const generatePaymentReceipt = async (
     throw notFoundError("Payment not found");
   }
 
+  if (payment.paymentStatus === "CANCELLED") {
+    throw validationError("Receipt cannot be generated for a cancelled payment");
+  }
+
   const documentNumber = `RCPT-${payment.id.slice(0, 8).toUpperCase()}`;
-  const pdfBuffer = await generatePdfBuffer("paymentReceipt", {
+  const pdfBuffer = await generateDocumentPdf("paymentReceipt", {
     tenant: {
       name: payment.tenant.name,
       address: joinAddress(payment.tenant),
