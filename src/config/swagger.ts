@@ -2,6 +2,179 @@ import swaggerJsdoc from "swagger-jsdoc";
 
 const productionApiUrl = process.env.PUBLIC_API_URL || "https://example.com";
 
+const adminAuthResponses = {
+  401: { $ref: "#/components/responses/UnauthorizedError" },
+  403: { $ref: "#/components/responses/ForbiddenError" },
+};
+
+const adminLogQueryParameters = [
+  { name: "level", in: "query", schema: { type: "string", example: "error" } },
+  { name: "category", in: "query", schema: { type: "string", example: "backup" } },
+  { name: "search", in: "query", schema: { type: "string" } },
+  { name: "startDate", in: "query", schema: { type: "string", format: "date-time" } },
+  { name: "endDate", in: "query", schema: { type: "string", format: "date-time" } },
+  { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+  { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 200, default: 50 } },
+];
+
+const buildAdminPaths = (basePath: string) => ({
+  [`${basePath}/logs`]: {
+    get: {
+      tags: ["Admin"],
+      summary: "List system logs",
+      parameters: adminLogQueryParameters,
+      responses: {
+        200: {
+          description: "Paginated system logs",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "array",
+                    items: { type: "object", additionalProperties: true },
+                  },
+                  pagination: {
+                    type: "object",
+                    properties: {
+                      total: { type: "integer", example: 125 },
+                      page: { type: "integer", example: 1 },
+                      limit: { type: "integer", example: 50 },
+                      totalPages: { type: "integer", example: 3 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        ...adminAuthResponses,
+      },
+    },
+  },
+  [`${basePath}/logs/stats`]: {
+    get: {
+      tags: ["Admin"],
+      summary: "Get system log statistics",
+      responses: {
+        200: {
+          description: "System log statistics",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  last24h: { type: "object", additionalProperties: true },
+                  last7d: { type: "object", additionalProperties: true },
+                  topErrors: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        message: { type: "string" },
+                        count: { type: "integer" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        ...adminAuthResponses,
+      },
+    },
+  },
+  [`${basePath}/backup/list`]: {
+    get: {
+      tags: ["Admin"],
+      summary: "List database backups",
+      responses: {
+        200: {
+          description: "Backup files",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        fileName: { type: "string", example: "flowoid-2026-05-16.sql.gz" },
+                        path: { type: "string" },
+                        size: { type: "integer", example: 1048576 },
+                        sizeFormatted: { type: "string", example: "1.00MB" },
+                        date: { type: "string", format: "date-time" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        ...adminAuthResponses,
+      },
+    },
+  },
+  [`${basePath}/backup/trigger`]: {
+    post: {
+      tags: ["Admin"],
+      summary: "Trigger a database backup",
+      responses: {
+        202: {
+          description: "Backup completed",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  status: { type: "string", enum: ["success"], example: "success" },
+                  finishedAt: { type: "string", format: "date-time" },
+                  output: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        ...adminAuthResponses,
+      },
+    },
+  },
+  [`${basePath}/backup/status`]: {
+    get: {
+      tags: ["Admin"],
+      summary: "Get database backup status",
+      responses: {
+        200: {
+          description: "Backup status",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  lastBackupTime: { type: "string", format: "date-time", nullable: true },
+                  nextScheduledBackup: { type: "string", example: "0 2 * * *" },
+                  status: {
+                    type: "string",
+                    enum: ["success", "failed", "running", "unknown"],
+                    example: "success",
+                  },
+                  message: { type: "string", nullable: true },
+                },
+              },
+            },
+          },
+        },
+        ...adminAuthResponses,
+      },
+    },
+  },
+});
+
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -23,9 +196,11 @@ const options: swaggerJsdoc.Options = {
     ],
     tags: [
       { name: "Health", description: "Service health checks" },
+      { name: "Documentation", description: "Swagger UI and OpenAPI document endpoints" },
       { name: "Auth", description: "Authentication and session management" },
       { name: "Tenants", description: "Tenant and business onboarding" },
       { name: "Monitoring", description: "Admin system monitoring and live metrics" },
+      { name: "Admin", description: "Admin logs and database backup operations" },
       { name: "Users", description: "User management" },
       { name: "Roles", description: "Role management" },
       { name: "Permissions", description: "Permission management" },
@@ -60,6 +235,40 @@ const options: swaggerJsdoc.Options = {
                       message: { type: "string", example: "OK" },
                     },
                   },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/docs": {
+        get: {
+          tags: ["Documentation"],
+          summary: "Open Swagger UI",
+          security: [],
+          responses: {
+            200: {
+              description: "Swagger UI HTML",
+              content: {
+                "text/html": {
+                  schema: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/docs-json": {
+        get: {
+          tags: ["Documentation"],
+          summary: "Get OpenAPI JSON document",
+          security: [],
+          responses: {
+            200: {
+              description: "OpenAPI document",
+              content: {
+                "application/json": {
+                  schema: { type: "object", additionalProperties: true },
                 },
               },
             },
@@ -3194,6 +3403,8 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      ...buildAdminPaths("/api/admin"),
+      ...buildAdminPaths("/admin"),
       "/api/whatsapp/webhook": {
         get: {
           tags: ["WhatsApp"],
@@ -3229,7 +3440,7 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
-      "/api/webhooks/whatsapp": {
+      "/webhooks/whatsapp": {
         get: {
           tags: ["WhatsApp"],
           summary: "Verify Meta WhatsApp webhook legacy endpoint",

@@ -11,7 +11,10 @@
     "test:design-module": "tsx scripts/testing/design-module-test.ts",
     "production": "pnpm install && pnpm prisma generate && pnpm build",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "db:push": "bash scripts/check-env.sh && prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
@@ -30,11 +33,15 @@
     "form-data": "^4.0.5",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
     "pdfkit": "^0.18.0",
     "pg": "^8.20.0",
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "winston-transport": "^4.9.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
