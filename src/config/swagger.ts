@@ -1,5 +1,7 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
+const productionApiUrl = process.env.PUBLIC_API_URL || "https://example.com";
+
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -15,8 +17,8 @@ const options: swaggerJsdoc.Options = {
         description: "Local Development Server",
       },
       {
-        url: "http://140.245.193.49:3000",
-        description: "Oracle VPS Production Server",
+        url: productionApiUrl,
+        description: "Production Server",
       },
     ],
     tags: [
@@ -39,6 +41,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Orders", description: "Dealer orders, dispatches, packaged stock deduction, and sale ledger entries" },
       { name: "Payments", description: "Dealer receipts, supplier payments, outstanding balances, aging, and cash flow" },
       { name: "Documents", description: "PDF invoices, delivery challans, and payment receipts" },
+      { name: "WhatsApp", description: "Meta WhatsApp Cloud API configuration, sends, templates, and webhooks" },
     ],
     paths: {
       "/health": {
@@ -3013,6 +3016,254 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/whatsapp/config": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Save or update WhatsApp Cloud API configuration",
+          description: "SUPER_ADMIN or TENANT_OWNER only. The access token is encrypted before storage.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SaveWhatsappConfigRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/WhatsappConfigSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+        get: {
+          tags: ["WhatsApp"],
+          summary: "Get current WhatsApp configuration",
+          description: "Returns the tenant WhatsApp configuration with the access token masked.",
+          responses: {
+            200: { $ref: "#/components/responses/WhatsappConfigSuccess" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/config/test": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Test WhatsApp Cloud API credentials",
+          responses: {
+            200: { $ref: "#/components/responses/GenericSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            503: { $ref: "#/components/responses/ServiceUnavailableError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/send/invoice/{orderId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/OrderIdPathParam" },
+        ],
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Send order invoice PDF via WhatsApp",
+          responses: {
+            201: { $ref: "#/components/responses/WhatsappMessageLogSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+            503: { $ref: "#/components/responses/ServiceUnavailableError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/send/receipt/{paymentId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PaymentIdPathParam" },
+        ],
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Send payment receipt PDF via WhatsApp",
+          responses: {
+            201: { $ref: "#/components/responses/WhatsappMessageLogSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+            503: { $ref: "#/components/responses/ServiceUnavailableError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/send/challan/{dispatchId}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          {
+            name: "dispatchId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Order dispatch ID",
+          },
+        ],
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Send delivery challan PDF via WhatsApp",
+          responses: {
+            201: { $ref: "#/components/responses/WhatsappMessageLogSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+            503: { $ref: "#/components/responses/ServiceUnavailableError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/logs": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        get: {
+          tags: ["WhatsApp"],
+          summary: "List WhatsApp message logs",
+          parameters: [
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+            { name: "messageType", in: "query", schema: { $ref: "#/components/schemas/WhatsappMessageType" } },
+            { name: "messageStatus", in: "query", schema: { $ref: "#/components/schemas/WhatsappMessageStatus" } },
+            { name: "partyId", in: "query", schema: { type: "string", format: "uuid" } },
+            { name: "fromDate", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "toDate", in: "query", schema: { type: "string", format: "date-time" } },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/WhatsappMessageLogListSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/logs/{id}": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/IdPathParam" },
+        ],
+        get: {
+          tags: ["WhatsApp"],
+          summary: "Get a WhatsApp message log",
+          responses: {
+            200: { $ref: "#/components/responses/WhatsappMessageLogSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/whatsapp/templates": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Submit a WhatsApp message template to Meta",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SubmitWhatsappTemplateRequest" },
+              },
+            },
+          },
+          responses: {
+            201: { $ref: "#/components/responses/GenericSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            503: { $ref: "#/components/responses/ServiceUnavailableError" },
+          },
+        },
+        get: {
+          tags: ["WhatsApp"],
+          summary: "List WhatsApp templates from Meta",
+          responses: {
+            200: { $ref: "#/components/responses/GenericSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            503: { $ref: "#/components/responses/ServiceUnavailableError" },
+          },
+        },
+      },
+      "/api/whatsapp/webhook": {
+        get: {
+          tags: ["WhatsApp"],
+          summary: "Verify Meta WhatsApp webhook",
+          security: [],
+          parameters: [
+            { name: "hub.mode", in: "query", required: true, schema: { type: "string", example: "subscribe" } },
+            { name: "hub.verify_token", in: "query", required: true, schema: { type: "string" } },
+            { name: "hub.challenge", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            200: {
+              description: "Webhook challenge string",
+              content: { "text/plain": { schema: { type: "string" } } },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+          },
+        },
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Receive Meta WhatsApp webhook status updates",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", additionalProperties: true },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/GenericSuccess" },
+          },
+        },
+      },
+      "/api/webhooks/whatsapp": {
+        get: {
+          tags: ["WhatsApp"],
+          summary: "Verify Meta WhatsApp webhook legacy endpoint",
+          security: [],
+          parameters: [
+            { name: "hub.mode", in: "query", required: true, schema: { type: "string", example: "subscribe" } },
+            { name: "hub.verify_token", in: "query", required: true, schema: { type: "string" } },
+            { name: "hub.challenge", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            200: {
+              description: "Webhook challenge string",
+              content: { "text/plain": { schema: { type: "string" } } },
+            },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+          },
+        },
+        post: {
+          tags: ["WhatsApp"],
+          summary: "Receive Meta WhatsApp webhook status updates legacy endpoint",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", additionalProperties: true },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/GenericSuccess" },
+          },
+        },
+      },
     },
     components: {
       parameters: {
@@ -4101,6 +4352,44 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        GenericSuccess: {
+          description: "Operation completed successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean", example: true },
+                  data: { type: "object", additionalProperties: true },
+                },
+              },
+            },
+          },
+        },
+        WhatsappConfigSuccess: {
+          description: "WhatsApp configuration response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WhatsappConfigResponse" },
+            },
+          },
+        },
+        WhatsappMessageLogSuccess: {
+          description: "WhatsApp message log response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WhatsappMessageLogResponse" },
+            },
+          },
+        },
+        WhatsappMessageLogListSuccess: {
+          description: "Paginated WhatsApp message logs",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/WhatsappMessageLogListResponse" },
+            },
+          },
+        },
         PdfFileSuccess: {
           description: "PDF file",
           content: {
@@ -4144,6 +4433,14 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        ServiceUnavailableError: {
+          description: "External service unavailable",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ErrorResponse" },
+            },
+          },
+        },
       },
       securitySchemes: {
         accessTokenCookie: {
@@ -4169,6 +4466,156 @@ const options: swaggerJsdoc.Options = {
         },
       },
       schemas: {
+        WhatsappProvider: {
+          type: "string",
+          enum: ["META_CLOUD_API"],
+          example: "META_CLOUD_API",
+        },
+        WhatsappMessageStatus: {
+          type: "string",
+          enum: ["QUEUED", "SENT", "DELIVERED", "READ", "FAILED"],
+          example: "SENT",
+        },
+        WhatsappMessageType: {
+          type: "string",
+          enum: ["INVOICE", "PAYMENT_RECEIPT", "DELIVERY_CHALLAN", "CUSTOM"],
+          example: "INVOICE",
+        },
+        SaveWhatsappConfigRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["provider", "phoneNumberId", "wabaId", "accessToken"],
+          properties: {
+            provider: { $ref: "#/components/schemas/WhatsappProvider" },
+            isEnabled: { type: "boolean", example: true },
+            phoneNumberId: { type: "string", example: "123456789012345" },
+            wabaId: { type: "string", example: "987654321098765" },
+            accessToken: {
+              type: "string",
+              minLength: 10,
+              format: "password",
+              example: "EAAG...",
+            },
+            fromPhoneNumber: {
+              type: "string",
+              nullable: true,
+              example: "+919876543210",
+            },
+            invoiceTemplateName: { type: "string", example: "send_invoice" },
+            paymentReceiptTemplateName: { type: "string", example: "payment_receipt" },
+            challansTemplateName: { type: "string", example: "delivery_challan" },
+          },
+        },
+        SubmitWhatsappTemplateRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "category", "components"],
+          properties: {
+            name: { type: "string", pattern: "^[a-z][a-z0-9_]*$", example: "send_invoice" },
+            language: { type: "string", default: "en", example: "en" },
+            category: {
+              type: "string",
+              enum: ["UTILITY", "MARKETING", "AUTHENTICATION"],
+              example: "UTILITY",
+            },
+            components: {
+              type: "array",
+              items: { type: "object", additionalProperties: true },
+              example: [
+                {
+                  type: "HEADER",
+                  format: "DOCUMENT",
+                  example: { header_handle: ["sample_pdf_handle"] },
+                },
+                {
+                  type: "BODY",
+                  text: "Please find your invoice attached.",
+                },
+              ],
+            },
+          },
+        },
+        WhatsappConfig: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            provider: { $ref: "#/components/schemas/WhatsappProvider" },
+            isEnabled: { type: "boolean", example: true },
+            phoneNumberId: { type: "string", nullable: true },
+            wabaId: { type: "string", nullable: true },
+            accessToken: { type: "string", nullable: true, example: "********1234" },
+            fromPhoneNumber: { type: "string", nullable: true, example: "+919876543210" },
+            invoiceTemplateName: { type: "string", nullable: true, example: "send_invoice" },
+            paymentReceiptTemplateName: { type: "string", nullable: true, example: "payment_receipt" },
+            challansTemplateName: { type: "string", nullable: true, example: "delivery_challan" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        WhatsappMessageLog: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tenantId: { type: "string", format: "uuid" },
+            configId: { type: "string", format: "uuid" },
+            partyId: { type: "string", format: "uuid", nullable: true },
+            toPhone: { type: "string", example: "919876543210" },
+            messageType: { $ref: "#/components/schemas/WhatsappMessageType" },
+            messageStatus: { $ref: "#/components/schemas/WhatsappMessageStatus" },
+            documentId: { type: "string", format: "uuid", nullable: true },
+            providerMessageId: { type: "string", nullable: true, example: "wamid.HBgN..." },
+            templateName: { type: "string", nullable: true, example: "send_invoice" },
+            templateVars: { type: "object", nullable: true, additionalProperties: true },
+            errorCode: { type: "string", nullable: true },
+            errorMessage: { type: "string", nullable: true },
+            sentAt: { type: "string", format: "date-time", nullable: true },
+            deliveredAt: { type: "string", format: "date-time", nullable: true },
+            readAt: { type: "string", format: "date-time", nullable: true },
+            failedAt: { type: "string", format: "date-time", nullable: true },
+            sentById: { type: "string", format: "uuid" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        WhatsappConfigResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              oneOf: [
+                { $ref: "#/components/schemas/WhatsappConfig" },
+                { type: "null" },
+              ],
+            },
+          },
+          required: ["success", "data"],
+        },
+        WhatsappMessageLogResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: { $ref: "#/components/schemas/WhatsappMessageLog" },
+          },
+          required: ["success", "data"],
+        },
+        WhatsappMessageLogListResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                items: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/WhatsappMessageLog" },
+                },
+                pagination: { $ref: "#/components/schemas/OrderPagination" },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
         RegisterRequest: {
           type: "object",
           required: ["name", "phone", "password"],

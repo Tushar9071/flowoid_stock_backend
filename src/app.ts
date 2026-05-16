@@ -28,6 +28,9 @@ import inventoryRoutes from "./modules/inventory/inventory.routes";
 import ordersRoutes from "./modules/orders/orders.routes";
 import paymentsRoutes from "./modules/payments/payments.routes";
 import documentsRoutes from "./modules/documents/documents.routes";
+import whatsappRoutes from "./modules/whatsapp/whatsapp.routes";
+import whatsappWebhookRoutes from "./modules/whatsapp/whatsapp-webhook.routes";
+import * as whatsappWebhookController from "./modules/whatsapp/whatsapp-webhook.controller";
 
 
 
@@ -86,6 +89,10 @@ app.use("/api/tenants/:tenantId/inventory", inventoryRoutes);
 app.use("/api/tenants/:tenantId/orders", ordersRoutes);
 app.use("/api/tenants/:tenantId/payments", paymentsRoutes);
 app.use("/api/tenants/:tenantId/documents", documentsRoutes);
+app.use("/api/tenants/:tenantId/whatsapp", whatsappRoutes);
+app.get("/api/whatsapp/webhook", whatsappWebhookController.verifyWebhook);
+app.post("/api/whatsapp/webhook", whatsappWebhookController.receiveStatusUpdate);
+app.use("/webhooks", whatsappWebhookRoutes);
 
 // Global error handler - always last
 app.use(errorHandler);

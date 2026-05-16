@@ -148,6 +148,5 @@ dist
 *.dump
 
 
-/prisma/migrations
 /tmp/
 /storage/
