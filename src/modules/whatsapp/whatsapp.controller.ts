@@ -16,6 +16,7 @@ import {
   saveWhatsappConfigSchema,
   submitTemplateSchema,
   tenantParamsSchema,
+  updateWhatsappAccessTokenSchema,
   type DispatchParams,
   type GetLogsQuery,
   type LogParams,
@@ -24,6 +25,7 @@ import {
   type SaveWhatsappConfigInput,
   type SubmitTemplateInput,
   type TenantParams,
+  type UpdateWhatsappAccessTokenInput,
 } from "./whatsapp.validation";
 
 const parseOrThrow = <T>(schema: z.ZodTypeAny, value: unknown): T => {
@@ -59,6 +61,25 @@ export const getConfig = async (
     const authReq = req as AuthenticatedRequest;
     const params = parseOrThrow<TenantParams>(tenantParamsSchema, req.params);
     const result = await configService.getMaskedConfig(params.tenantId, authReq.user);
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAccessToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const params = parseOrThrow<TenantParams>(tenantParamsSchema, req.params);
+    const input = parseOrThrow<UpdateWhatsappAccessTokenInput>(
+      updateWhatsappAccessTokenSchema,
+      req.body,
+    );
+    const result = await configService.updateAccessToken(params.tenantId, input, authReq.user);
     successResponse(res, result);
   } catch (error) {
     next(error);

@@ -3257,6 +3257,30 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      "/api/tenants/{tenantId}/whatsapp/config/access-token": {
+        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
+        patch: {
+          tags: ["WhatsApp"],
+          summary: "Update WhatsApp Cloud API access token",
+          description:
+            "Updates only the encrypted WhatsApp access token for an existing tenant configuration. Any authenticated user with access to the tenant can use this testing helper.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpdateWhatsappAccessTokenRequest" },
+              },
+            },
+          },
+          responses: {
+            200: { $ref: "#/components/responses/WhatsappConfigSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
       "/api/tenants/{tenantId}/whatsapp/config/test": {
         parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
         post: {
@@ -4715,6 +4739,19 @@ const options: swaggerJsdoc.Options = {
             invoiceTemplateName: { type: "string", example: "send_invoice" },
             paymentReceiptTemplateName: { type: "string", example: "payment_receipt" },
             challansTemplateName: { type: "string", example: "delivery_challan" },
+          },
+        },
+        UpdateWhatsappAccessTokenRequest: {
+          type: "object",
+          additionalProperties: false,
+          required: ["accessToken"],
+          properties: {
+            accessToken: {
+              type: "string",
+              minLength: 10,
+              format: "password",
+              example: "EAAG...",
+            },
           },
         },
         SubmitWhatsappTemplateRequest: {

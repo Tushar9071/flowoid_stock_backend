@@ -50,6 +50,10 @@ export const saveWhatsappConfigSchema = z.object({
   challansTemplateName: z.string().trim().min(1).optional(),
 });
 
+export const updateWhatsappAccessTokenSchema = z.object({
+  accessToken: z.string().min(10, "Access token must be at least 10 characters"),
+});
+
 export const submitTemplateSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, "Template name must be snake_case"),
   language: z.string().trim().min(2).default("en"),
@@ -79,5 +83,6 @@ export type PaymentParams = z.infer<typeof paymentParamsSchema>;
 export type DispatchParams = z.infer<typeof dispatchParamsSchema>;
 export type LogParams = z.infer<typeof logParamsSchema>;
 export type SaveWhatsappConfigInput = z.infer<typeof saveWhatsappConfigSchema>;
+export type UpdateWhatsappAccessTokenInput = z.infer<typeof updateWhatsappAccessTokenSchema>;
 export type SubmitTemplateInput = z.infer<typeof submitTemplateSchema>;
 export type GetLogsQuery = z.infer<typeof getLogsQuerySchema>;

@@ -4,7 +4,10 @@ import { Logger } from "@nestjs/common";
 
 import { AppError, forbiddenError, notFoundError, validationError } from "../../common/errors/app-error";
 import prisma from "../../lib/prisma";
-import type { SaveWhatsappConfigInput } from "./whatsapp.validation";
+import type {
+  SaveWhatsappConfigInput,
+  UpdateWhatsappAccessTokenInput,
+} from "./whatsapp.validation";
 
 type CurrentUser = {
   userId: string;
@@ -143,6 +146,30 @@ export const saveConfig = async (
       paymentReceiptTemplateName: input.paymentReceiptTemplateName,
       challansTemplateName: input.challansTemplateName,
     },
+  });
+
+  return { ...config, accessToken: "********" };
+};
+
+export const updateAccessToken = async (
+  tenantId: string,
+  input: UpdateWhatsappAccessTokenInput,
+  currentUser: CurrentUser,
+) => {
+  await assertTenantAccess(tenantId, currentUser);
+
+  const existingConfig = await prisma.tenantWhatsappConfig.findUnique({
+    where: { tenantId },
+    select: { id: true },
+  });
+
+  if (!existingConfig) {
+    throw notFoundError("WhatsApp configuration not found for this tenant");
+  }
+
+  const config = await prisma.tenantWhatsappConfig.update({
+    where: { tenantId },
+    data: { accessToken: encryptAccessToken(input.accessToken) },
   });
 
   return { ...config, accessToken: "********" };

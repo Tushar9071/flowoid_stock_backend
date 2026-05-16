@@ -19,6 +19,7 @@ router.use(requireAuth);
  */
 router.post("/config", ctrl.saveConfig);
 router.get("/config", ctrl.getConfig);
+router.patch("/config/access-token", ctrl.updateAccessToken);
 
 /**
  * @openapi
