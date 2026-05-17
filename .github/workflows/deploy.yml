@@ -68,17 +68,15 @@ jobs:
             docker pull "$IMAGE"
 
             docker run --rm \
-              --network host \
               --env-file /opt/flowoid/.env.backend \
               "$IMAGE" \
               pnpm db:migrate
 
-            cat > "$OVERRIDE_FILE" << 'EOF'
-services:
-  backend:
-    image: IMAGE_PLACEHOLDER
-EOF
-            sed -i "s|IMAGE_PLACEHOLDER|$IMAGE|g" "$OVERRIDE_FILE"
+            cat > "$OVERRIDE_FILE" <<EOF
+            services:
+              backend:
+                image: $IMAGE
+            EOF
 
             docker stack deploy \
               --with-registry-auth \
