@@ -5,7 +5,8 @@ WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+# Remove corepack, install pnpm directly
+RUN npm install -g pnpm@10.33.2
 
 FROM base AS deps
 
