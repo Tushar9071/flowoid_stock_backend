@@ -7,7 +7,7 @@ import prisma from "./lib/prisma";
 import { initializeMonitoringSocket } from "./socket/monitoring.socket";
 import logger from "./utils/logger";
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 
 async function main() {
   await prisma.$connect();

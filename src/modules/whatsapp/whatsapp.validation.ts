@@ -56,7 +56,7 @@ export const updateWhatsappAccessTokenSchema = z.object({
 
 export const submitTemplateSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, "Template name must be snake_case"),
-  language: z.string().trim().min(2).default("en"),
+  language: z.string().trim().min(2).default("en_US"),
   category: z.enum(["UTILITY", "MARKETING", "AUTHENTICATION"]),
   components: z.array(z.record(z.unknown())).min(1),
 });

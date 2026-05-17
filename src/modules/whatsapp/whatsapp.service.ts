@@ -21,6 +21,8 @@ type EnabledWhatsappConfig = Awaited<ReturnType<typeof getEnabledConfigOrThrow>>
 const logger = new Logger("WhatsappService");
 
 const getApiVersion = (): string => process.env.WHATSAPP_API_VERSION || "v19.0";
+const DEFAULT_TEMPLATE_LANGUAGE_CODE = "en_US";
+const DEFAULT_INVOICE_TEMPLATE_NAME = "invoice";
 
 const serviceUnavailableError = (message: string, details?: unknown): AppError =>
   new AppError(503, message, "WHATSAPP_META_API_FAILED", details);
@@ -173,7 +175,7 @@ export const sendTemplateMessage = async (
         type: "template",
         template: {
           name: templateName,
-          language: { code: "en" },
+          language: { code: DEFAULT_TEMPLATE_LANGUAGE_CODE },
           components,
         },
       },
@@ -320,7 +322,7 @@ export const sendInvoice = async (
     documentId: document.id,
     documentNumber: document.documentNumber,
     filePath: document.filePath,
-    templateName: config.invoiceTemplateName || "send_invoice",
+    templateName: config.invoiceTemplateName || DEFAULT_INVOICE_TEMPLATE_NAME,
     messageType: "INVOICE",
     sentById,
   });

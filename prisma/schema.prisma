@@ -1025,7 +1025,7 @@ model TenantWhatsappConfig {
   wabaId                     String?
   accessToken                String?
   fromPhoneNumber            String?
-  invoiceTemplateName        String?          @default("send_invoice")
+  invoiceTemplateName        String?          @default("invoice")
   paymentReceiptTemplateName String?          @default("payment_receipt")
   challansTemplateName       String?          @default("delivery_challan")
   createdAt                  DateTime         @default(now())
