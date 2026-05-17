@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: flowoid-backend:local
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      BACKUP_DIR: /var/backups/flowoid
+      DOCUMENT_STORAGE_DIR: /app/storage/generated-documents
+    ports:
+      - "8000:8000"
+    volumes:
+      - flowoid_logs:/app/logs
+      - flowoid_documents:/app/storage/generated-documents
+      - flowoid_backups:/var/backups/flowoid
+    restart: unless-stopped
+
+volumes:
+  flowoid_logs:
+  flowoid_documents:
+  flowoid_backups:

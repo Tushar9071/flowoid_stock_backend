@@ -17,6 +17,7 @@ type CurrentUser = {
 };
 
 type EnabledWhatsappConfig = Awaited<ReturnType<typeof getEnabledConfigOrThrow>>;
+type TemplateVars = Record<string, string>;
 
 const logger = new Logger("WhatsappService");
 
@@ -41,6 +42,37 @@ export const formatPhoneE164 = (phone: string): string => {
 };
 
 const getDocumentFilename = (documentNumber: string): string => `${documentNumber}.pdf`;
+
+const formatDate = (date: Date | null | undefined): string =>
+  date
+    ? date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "-";
+
+const formatCurrency = (amount: unknown): string => {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return "-";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(numericAmount);
+};
+
+const formatStatus = (status: string): string =>
+  status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const toTextParameter = (text: string): Record<string, string> => ({
+  type: "text",
+  text: text || "-",
+});
 
 const resolveLocalPath = (filePath: string): string =>
   path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
@@ -282,6 +314,8 @@ const sendDocumentTemplate = async (input: {
   documentNumber: string;
   filePath: string | null;
   templateName: string;
+  bodyParameters: string[];
+  templateVars: TemplateVars;
   messageType: "INVOICE" | "PAYMENT_RECEIPT" | "DELIVERY_CHALLAN";
   sentById: string;
 }) => {
@@ -309,6 +343,7 @@ const sendDocumentTemplate = async (input: {
         documentNumber: input.documentNumber,
         filename,
         languageCode: templateLanguageCode,
+        ...input.templateVars,
       },
       sentById: input.sentById,
     },
@@ -316,7 +351,7 @@ const sendDocumentTemplate = async (input: {
 
   try {
     const mediaId = await uploadPdfToMeta(config, pdfBuffer, filename);
-    const components = [
+    const components: Record<string, unknown>[] = [
       {
         type: "header",
         parameters: [
@@ -330,6 +365,12 @@ const sendDocumentTemplate = async (input: {
         ],
       },
     ];
+    if (input.bodyParameters.length > 0) {
+      components.push({
+        type: "body",
+        parameters: input.bodyParameters.map(toTextParameter),
+      });
+    }
 
     const result = await sendTemplateMessage(
       config,
@@ -383,6 +424,20 @@ export const sendInvoice = async (
     documentNumber: document.documentNumber,
     filePath: document.filePath,
     templateName: config.invoiceTemplateName || DEFAULT_INVOICE_TEMPLATE_NAME,
+    bodyParameters: [
+      order.dealer.name,
+      document.documentNumber,
+      formatCurrency(order.totalAmount),
+      formatDate(order.dueDate),
+      order.isCreditOrder ? "Pending" : "Paid",
+    ],
+    templateVars: {
+      dealerName: order.dealer.name,
+      invoiceNumber: document.documentNumber,
+      amount: formatCurrency(order.totalAmount),
+      dueDate: formatDate(order.dueDate),
+      status: order.isCreditOrder ? "Pending" : "Paid",
+    },
     messageType: "INVOICE",
     sentById,
   });
@@ -419,6 +474,20 @@ export const sendPaymentReceipt = async (
     documentNumber: document.documentNumber,
     filePath: document.filePath,
     templateName: config.paymentReceiptTemplateName || "payment_receipt",
+    bodyParameters: [
+      payment.party.name,
+      document.documentNumber,
+      formatCurrency(payment.amount),
+      formatDate(payment.paymentDate),
+      formatStatus(payment.paymentStatus),
+    ],
+    templateVars: {
+      partyName: payment.party.name,
+      receiptNumber: document.documentNumber,
+      amount: formatCurrency(payment.amount),
+      paymentDate: formatDate(payment.paymentDate),
+      status: formatStatus(payment.paymentStatus),
+    },
     messageType: "PAYMENT_RECEIPT",
     sentById,
   });
@@ -455,6 +524,20 @@ export const sendDeliveryChallan = async (
     documentNumber: document.documentNumber,
     filePath: document.filePath,
     templateName: config.challansTemplateName || "delivery_challan",
+    bodyParameters: [
+      dispatch.order.dealer.name,
+      document.documentNumber,
+      dispatch.order.orderNumber,
+      formatDate(dispatch.dispatchedAt),
+      dispatch.trackingRef || dispatch.transportMode,
+    ],
+    templateVars: {
+      dealerName: dispatch.order.dealer.name,
+      challanNumber: document.documentNumber,
+      orderNumber: dispatch.order.orderNumber,
+      dispatchDate: formatDate(dispatch.dispatchedAt),
+      transportDetails: dispatch.trackingRef || dispatch.transportMode,
+    },
     messageType: "DELIVERY_CHALLAN",
     sentById,
   });

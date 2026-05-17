@@ -1,98 +1,89 @@
-name: Deploy to VPS
+name: Build and Deploy Docker Image
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/tushar9071/flowoid-backend
+  STACK_NAME: flowoid
+  STACK_FILE: /opt/flowoid/docker-stack.yml
 
 jobs:
-  build:
-    name: Build & Verify
+  build-and-push:
+    name: Build and Push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          node-version: "24"
-          cache: "pnpm"
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Create .env file
-        run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-          echo "JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}" >> .env
-          echo "PORT=${{ secrets.PORT }}" >> .env
-          echo "JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}" >> .env
-          echo "JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}" >> .env
-          echo "JWT_ACCESS_EXPIRES_IN=${{ secrets.JWT_ACCESS_EXPIRES_IN }}" >> .env
-          echo "JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}" >> .env
-          echo "AUTH_COOKIE_SAME_SITE=${{ secrets.AUTH_COOKIE_SAME_SITE }}" >> .env
-
-      - name: Generate Prisma client
-        run: pnpm prisma generate
-
-      - name: Build TypeScript
-        run: pnpm run build
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy to Server
-    needs: build
+    needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy Docker stack
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
-          username: deploy
+          username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
           script: |
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+            set -euo pipefail
 
-            cd /home/deploy/flowoid_stock_backend
+            IMAGE="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            OVERRIDE_FILE="/tmp/flowoid-backend-${{ github.sha }}.yml"
 
-            # Save current commit BEFORE pulling (for rollback)
-            git rev-parse HEAD > /home/deploy/flowoid_stock_backend/.last_good_deploy
+            docker pull "$IMAGE"
 
-            git pull origin master
+            docker run --rm \
+              --env-file /opt/flowoid/.env.backend \
+              "$IMAGE" \
+              pnpm db:migrate
 
-            pnpm install --frozen-lockfile
-            pnpm prisma generate
-            pnpm run build
+            cat > "$OVERRIDE_FILE" <<EOF
+            services:
+              backend:
+                image: $IMAGE
+            EOF
 
-            # pnpm prisma migrate deploy
+            docker stack deploy \
+              --with-registry-auth \
+              -c "${{ env.STACK_FILE }}" \
+              -c "$OVERRIDE_FILE" \
+              "${{ env.STACK_NAME }}"
 
-            pm2 reload ecosystem.config.js --update-env
+            rm -f "$OVERRIDE_FILE"
 
-            # Health check (6 attempts, 5s apart = 30s total)
-            for i in $(seq 1 6); do
-              sleep 5
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health)
-              if [ "$STATUS" = "200" ]; then
-                echo "Deploy successful!"
-                exit 0
-              fi
-              echo "Attempt $i: got $STATUS..."
-            done
-
-            echo "Health check failed! Rolling back..."
-            PREV=$(cat /home/deploy/flowoid_stock_backend/.last_good_deploy)
-            git checkout "$PREV"
-            pnpm install --frozen-lockfile
-            pnpm prisma generate
-            pnpm run build
-            pm2 reload ecosystem.config.js --update-env
-            echo "Rolled back to $PREV"
-            exit 1
+            echo "Deployed $IMAGE to stack ${{ env.STACK_NAME }}"
+ 

@@ -1,54 +1,50 @@
-# ── Stage 1: Build ────────────────────────────────────────────
-FROM node:lts-alpine AS builder
+FROM node:lts-alpine AS base
 
 WORKDIR /app
 
-# Install pnpm globally
-RUN npm i -g pnpm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
-# Copy dependency manifests first (layer cache)
+RUN corepack enable
+
+FROM base AS deps
+
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Install ALL dependencies (dev + prod) — needed for tsc & prisma
 RUN pnpm install --frozen-lockfile
 
-# Copy prisma schema and config so we can generate the client
+FROM deps AS builder
+
 COPY prisma ./prisma
-COPY prisma.config.ts ./
-
-# Generate Prisma client
-RUN pnpm prisma generate
-
-# Copy the rest of the source code
-COPY tsconfig.json ./
+COPY prisma.config.ts tsconfig.json ./
 COPY src ./src
 
-# Build (tsc → dist/)
+RUN DATABASE_URL="postgresql://user:password@localhost:5432/flowoid" pnpm prisma generate
 RUN pnpm build
 
-# ── Stage 2: Production runtime ──────────────────────────────
-FROM node:lts-alpine AS runner
-
-WORKDIR /app
+FROM base AS runner
 
 ENV NODE_ENV=production
+ENV PORT=8000
 
-# Install pnpm globally
-RUN npm i -g pnpm
+RUN apk add --no-cache bash postgresql-client \
+  && mkdir -p /app/logs /app/storage/generated-documents /var/backups/flowoid \
+  && chown -R node:node /app /var/backups/flowoid
 
-# Copy dependency manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Install all deps (prisma CLI is a devDependency), generate client, then prune
-RUN pnpm install --frozen-lockfile
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN pnpm prisma generate
-RUN pnpm prune --prod
 
-# Copy compiled output
-COPY --from=builder /app/dist ./dist
+RUN pnpm install --frozen-lockfile \
+  && DATABASE_URL="postgresql://user:password@localhost:5432/flowoid" pnpm prisma generate
+
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --chown=node:node scripts ./scripts
+
+USER node
 
 EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 8000) + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "dist/index.js"]

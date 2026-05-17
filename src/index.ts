@@ -7,7 +7,14 @@ import prisma from "./lib/prisma";
 import { initializeMonitoringSocket } from "./socket/monitoring.socket";
 import logger from "./utils/logger";
 
-const PORT = process.env.PORT || 8000;
+const parsePort = (value: string | undefined): number => {
+  const normalized = value?.trim().replace(/^["']|["']$/g, "");
+  const port = Number.parseInt(normalized || "8000", 10);
+
+  return Number.isFinite(port) && port > 0 ? port : 8000;
+};
+
+const PORT = parsePort(process.env.PORT);
 
 async function main() {
   await prisma.$connect();

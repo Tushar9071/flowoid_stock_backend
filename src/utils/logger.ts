@@ -113,6 +113,10 @@ class DbLoggerTransport extends TransportStream {
     import("../lib/prisma.js")
       .then((module) => {
         const prisma = (module as any).default;
+        if (!prisma?.systemLog?.create) {
+          return Promise.resolve();
+        }
+
         return prisma.systemLog.create({
           data: {
             level: String(normalized.level),

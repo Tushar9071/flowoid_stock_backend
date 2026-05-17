@@ -114,10 +114,21 @@ export const runBackup = async () => {
 };
 
 export const getBackupStatus = async () => {
-  const lastBackupLog = await prisma.systemLog.findFirst({
-    where: { category: "backup" },
-    orderBy: { createdAt: "desc" },
-  });
+  let lastBackupLog: Awaited<ReturnType<typeof prisma.systemLog.findFirst>> = null;
+
+  try {
+    lastBackupLog = await prisma.systemLog.findFirst({
+      where: { category: "backup" },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    logger.warn("Could not read backup status from database", {
+      category: "backup",
+      meta: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+  }
 
   return {
     lastBackupTime: lastBackupLog?.createdAt ?? lastInMemoryStatus?.time ?? null,
