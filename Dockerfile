@@ -39,13 +39,12 @@ RUN npm i -g pnpm
 # Copy dependency manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
-
-# Copy prisma schema + config and generate client in runner's own node_modules
+# Install all deps (prisma CLI is a devDependency), generate client, then prune
+RUN pnpm install --frozen-lockfile
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 RUN pnpm prisma generate
+RUN pnpm prune --prod
 
 # Copy compiled output
 COPY --from=builder /app/dist ./dist
