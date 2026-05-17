@@ -21,8 +21,8 @@ type EnabledWhatsappConfig = Awaited<ReturnType<typeof getEnabledConfigOrThrow>>
 const logger = new Logger("WhatsappService");
 
 const getApiVersion = (): string => process.env.WHATSAPP_API_VERSION || "v19.0";
-const DEFAULT_TEMPLATE_LANGUAGE_CODE = "en_US";
 const DEFAULT_INVOICE_TEMPLATE_NAME = "invoice";
+const APPROVED_TEMPLATE_STATUS = "APPROVED";
 
 const serviceUnavailableError = (message: string, details?: unknown): AppError =>
   new AppError(503, message, "WHATSAPP_META_API_FAILED", details);
@@ -158,15 +158,63 @@ const uploadPdfToMeta = async (
   }
 };
 
+const resolveTemplateLanguageCode = async (
+  config: EnabledWhatsappConfig,
+  templateName: string,
+): Promise<string> => {
+  try {
+    const response = await axios.get(
+      `https://graph.facebook.com/${getApiVersion()}/${config.wabaId}/message_templates`,
+      {
+        headers: { Authorization: `Bearer ${config.accessToken}` },
+        params: {
+          name: templateName,
+          fields: "name,language,status",
+        },
+        timeout: 10000,
+      },
+    );
+
+    const templates = Array.isArray(response.data?.data) ? response.data.data : [];
+    const exactMatches = templates.filter((template: any) => template?.name === templateName);
+    const approvedMatch =
+      exactMatches.find((template: any) => template?.status === APPROVED_TEMPLATE_STATUS) ??
+      exactMatches[0];
+
+    if (approvedMatch?.language) {
+      logger.log(
+        `Resolved WhatsApp template ${templateName} language ${approvedMatch.language}`,
+      );
+      return approvedMatch.language;
+    }
+
+    const visibleTemplates = templates
+      .map((template: any) => `${template?.name || "unknown"}:${template?.language || "unknown"}`)
+      .join(", ");
+    throw validationError(
+      visibleTemplates
+        ? `WhatsApp template ${templateName} was not found in configured WABA. Available matches: ${visibleTemplates}`
+        : `WhatsApp template ${templateName} was not found in configured WABA`,
+    );
+  } catch (error: any) {
+    if (error instanceof AppError) throw error;
+
+    const metaError = getMetaError(error);
+    logger.error(`WhatsApp template language lookup failed: ${metaError.message}`);
+    throw serviceUnavailableError(metaError.message, metaError.details);
+  }
+};
+
 export const sendTemplateMessage = async (
   config: EnabledWhatsappConfig,
   toPhone: string,
   templateName: string,
+  languageCode: string,
   components: Record<string, unknown>[],
   logId: string,
 ) => {
   try {
-    logger.log(`Sending WhatsApp template ${templateName} to ${toPhone}`);
+    logger.log(`Sending WhatsApp template ${templateName} (${languageCode}) to ${toPhone}`);
     const response = await axios.post(
       `https://graph.facebook.com/${getApiVersion()}/${config.phoneNumberId}/messages`,
       {
@@ -175,7 +223,7 @@ export const sendTemplateMessage = async (
         type: "template",
         template: {
           name: templateName,
-          language: { code: DEFAULT_TEMPLATE_LANGUAGE_CODE },
+          language: { code: languageCode },
           components,
         },
       },
@@ -244,6 +292,7 @@ const sendDocumentTemplate = async (input: {
   const config = await getEnabledConfigOrThrow(input.tenantId);
   const toPhone = formatPhoneE164(input.phone);
   const filename = getDocumentFilename(input.documentNumber);
+  const templateLanguageCode = await resolveTemplateLanguageCode(config, input.templateName);
   const pdfBuffer = await readPdfBuffer(input.filePath);
 
   const log = await prisma.whatsappMessageLog.create({
@@ -256,7 +305,11 @@ const sendDocumentTemplate = async (input: {
       messageStatus: "QUEUED",
       documentId: input.documentId,
       templateName: input.templateName,
-      templateVars: { documentNumber: input.documentNumber, filename },
+      templateVars: {
+        documentNumber: input.documentNumber,
+        filename,
+        languageCode: templateLanguageCode,
+      },
       sentById: input.sentById,
     },
   });
@@ -278,7 +331,14 @@ const sendDocumentTemplate = async (input: {
       },
     ];
 
-    const result = await sendTemplateMessage(config, toPhone, input.templateName, components, log.id);
+    const result = await sendTemplateMessage(
+      config,
+      toPhone,
+      input.templateName,
+      templateLanguageCode,
+      components,
+      log.id,
+    );
     return result.log;
   } catch (error) {
     const current = await prisma.whatsappMessageLog.findUnique({
