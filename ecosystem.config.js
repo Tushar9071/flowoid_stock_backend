@@ -13,7 +13,7 @@ module.exports = {
       env_file: "/home/deploy/flowoid_stock_backend/.env",
       env: {
         NODE_ENV: "production",
-        PORT: process.env.PORT,
+        PORT: 8000,
       },
     },
   ],
