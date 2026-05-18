@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "http";
 import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
 import { ACCESS_TOKEN_SECRET } from "../config/auth";
+import { socketCorsOptions } from "../config/cors";
 import type { JwtPayload } from "../types/auth.types";
 import { getMetricsSnapshot } from "../modules/monitoring/monitoring.service";
 
@@ -33,10 +34,7 @@ const getSocketToken = (socket: any): string | undefined => {
 
 export const initializeMonitoringSocket = (server: HttpServer): Server => {
   const io = new Server(server, {
-    cors: {
-      origin: true,
-      credentials: true,
-    },
+    cors: socketCorsOptions,
   });
 
   const monitoringNamespace = io.of("/admin-monitoring");

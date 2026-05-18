@@ -10,6 +10,7 @@ import helmet from "helmet";
 import fs from "fs/promises";
 import path from "path";
 
+import { corsOptions } from "./config/cors";
 import { errorHandler } from "./middleware/error.middleware";
 import { collectApiMetrics } from "./middleware/metrics.middleware";
 import { requestLogger } from "./middleware/requestLogger.middleware";
@@ -61,14 +62,7 @@ app.use(
 
 // Middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      callback(null, origin ?? true);
-    },
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 app.use(collectApiMetrics);
