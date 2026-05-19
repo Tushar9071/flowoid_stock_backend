@@ -117,11 +117,11 @@ const optionalPositiveMoney = z.preprocess((value) => {
 const createOrderItemSchema = z
   .object({
     designId: z.string().uuid("Design ID must be a valid UUID"),
-    quantityDozens: z.coerce
+    quantityPieces: z.coerce
       .number()
-      .int("Quantity must be a whole number of dozens")
-      .positive("Quantity dozens must be greater than 0"),
-    pricePerDozen: optionalPositiveMoney,
+      .int("Quantity must be a whole number of pieces")
+      .positive("Quantity pieces must be greater than 0"),
+    pricePerPiece: optionalPositiveMoney,
     notes: optionalTrimmedString,
   })
   .strict();
@@ -169,12 +169,12 @@ export const addOrderItemSchema = createOrderItemSchema.strict();
 
 export const updateOrderItemSchema = z
   .object({
-    quantityDozens: z.coerce
+    quantityPieces: z.coerce
       .number()
-      .int("Quantity must be a whole number of dozens")
-      .positive("Quantity dozens must be greater than 0")
+      .int("Quantity must be a whole number of pieces")
+      .positive("Quantity pieces must be greater than 0")
       .optional(),
-    pricePerDozen: positiveMoney.optional(),
+    pricePerPiece: positiveMoney.optional(),
     notes: optionalTrimmedString,
   })
   .strict()
@@ -197,10 +197,10 @@ export const dispatchOrderSchema = z
         z
           .object({
             itemId: z.string().uuid("Order item ID must be a valid UUID"),
-            dozens: z.coerce
+            pieces: z.coerce
               .number()
-              .int("Dispatched dozens must be a whole number")
-              .positive("Dispatched dozens must be greater than 0"),
+              .int("Dispatched pieces must be a whole number")
+              .positive("Dispatched pieces must be greater than 0"),
           })
           .strict(),
       )

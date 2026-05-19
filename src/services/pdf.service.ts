@@ -24,8 +24,8 @@ type InvoiceData = {
   items: Array<{
     designCode: string;
     designName: string;
-    quantityDozens: number;
-    pricePerDozen: string;
+    quantityPieces: number;
+    pricePerPiece: string;
     lineTotal: string;
   }>;
   subtotalAmount: string;
@@ -48,9 +48,9 @@ type ChallanData = {
   items: Array<{
     designCode: string;
     designName: string;
-    dozens: number;
+    pieces: number;
   }>;
-  totalDozens: number;
+  totalPieces: number;
   transportMode: string;
   trackingRef: string;
 };
@@ -300,15 +300,15 @@ const renderInvoice = (doc: PDFKit.PDFDocument, data: InvoiceData): void => {
     [
       { label: "Design Code", width: 95 },
       { label: "Design Name", width: 190 },
-      { label: "Qty (Dozens)", width: 80, align: "right" },
-      { label: "Price/Dozen", width: 90, align: "right" },
+      { label: "Qty (Pieces)", width: 80, align: "right" },
+      { label: "Price/Piece", width: 90, align: "right" },
       { label: "Total", width: 98, align: "right" },
     ],
     data.items.map((item) => [
       item.designCode,
       item.designName,
-      String(item.quantityDozens),
-      item.pricePerDozen,
+      String(item.quantityPieces),
+      item.pricePerPiece,
       item.lineTotal,
     ]),
   );
@@ -370,16 +370,16 @@ const renderChallan = (doc: PDFKit.PDFDocument, data: ChallanData): void => {
     [
       { label: "Design Code", width: 120 },
       { label: "Design Name", width: 310 },
-      { label: "Dozens", width: 123, align: "right" },
+      { label: "Pieces", width: 123, align: "right" },
     ],
-    data.items.map((item) => [item.designCode, item.designName, String(item.dozens)]),
+    data.items.map((item) => [item.designCode, item.designName, String(item.pieces)]),
     { headerFill: "#f2f4f7", headerText: "#1f2937" },
   );
 
   ensureSpace(doc, 80);
   doc.font("Helvetica-Bold").fontSize(10);
-  writeText(doc, "Total Dozens", PAGE_MARGIN, doc.y + 12, { width: 200 });
-  writeText(doc, String(data.totalDozens), 430, doc.y + 12, { width: 123, align: "right" });
+  writeText(doc, "Total Pieces", PAGE_MARGIN, doc.y + 12, { width: 200 });
+  writeText(doc, String(data.totalPieces), 430, doc.y + 12, { width: 123, align: "right" });
   doc.y += 55;
 
   drawBox(doc, PAGE_MARGIN, doc.y, 245, 48, "Transport Mode", data.transportMode);

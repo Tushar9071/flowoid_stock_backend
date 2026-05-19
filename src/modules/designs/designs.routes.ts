@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { requireAuth } from "../../middleware/auth.middleware";
 import { requirePermission } from "../../middleware/permission.middleware";
+import { uploadDesignImage } from "../../middleware/upload.middleware";
 import * as ctrl from "./designs.controller";
 
 const router: Router = Router({ mergeParams: true });
@@ -37,9 +38,9 @@ router.get("/", // requirePermission("designs.read"),
   ctrl.getAllDesigns);
 router.get("/:id", // requirePermission("designs.read"),
   ctrl.getDesignById);
-router.post("/", // requirePermission("designs.create"),
+router.post("/", uploadDesignImage, // requirePermission("designs.create"),
   ctrl.createDesign);
-router.patch("/:id", // requirePermission("designs.update"),
+router.patch("/:id", uploadDesignImage, // requirePermission("designs.update"),
   ctrl.updateDesign);
 router.patch(
   "/:id/status",

@@ -12,6 +12,7 @@ import {
   createSupplierPaymentSchema,
   dailyCashFlowQuerySchema,
   listPaymentsQuerySchema,
+  partyOrderOutstandingQuerySchema,
   partyParamsSchema,
   paymentParamsSchema,
   tenantParamsSchema,
@@ -21,6 +22,7 @@ import {
   type CreateSupplierPaymentInput,
   type DailyCashFlowQuery,
   type ListPaymentsQuery,
+  type PartyOrderOutstandingQuery,
   type PartyParams,
   type PaymentParams,
   type TenantParams,
@@ -150,6 +152,31 @@ export const getPartyOutstanding = async (
     const result = await paymentsService.getPartyOutstanding(
       params.tenantId,
       params.partyId,
+      authReq.user,
+    );
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPartyOrderOutstanding = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const params = parseOrThrow<PartyParams>(partyParamsSchema, req.params);
+    const query = parseOrThrow<PartyOrderOutstandingQuery>(
+      partyOrderOutstandingQuerySchema,
+      req.query,
+    );
+
+    const result = await paymentsService.getPartyOrderOutstanding(
+      params.tenantId,
+      params.partyId,
+      query,
       authReq.user,
     );
     successResponse(res, result);

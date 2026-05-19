@@ -14,7 +14,6 @@ import {
   packagingBatchParamsSchema,
   stockParamsSchema,
   tenantParamsSchema,
-  updateLowStockAlertSchema,
   type CreatePackagingBatchInput,
   type CreateStockAdjustmentInput,
   type ListPackagingBatchesQuery,
@@ -22,7 +21,6 @@ import {
   type PackagingBatchParams,
   type StockParams,
   type TenantParams,
-  type UpdateLowStockAlertInput,
 } from "./inventory.validation";
 
 const parseOrThrow = <T>(schema: z.ZodTypeAny, value: unknown): T => {
@@ -67,26 +65,6 @@ export const getStockByDesign = async (
     const result = await inventoryService.getStockByDesign(
       params.tenantId,
       params.designId,
-      authReq.user,
-    );
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getLowStockAlerts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const params = parseOrThrow<TenantParams>(tenantParamsSchema, req.params);
-
-    const result = await inventoryService.getLowStockAlerts(
-      params.tenantId,
       authReq.user,
     );
 
@@ -162,32 +140,6 @@ export const getPackagingBatchById = async (
     const result = await inventoryService.getPackagingBatchById(
       params.tenantId,
       params.batchId,
-      authReq.user,
-    );
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateLowStockAlert = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const params = parseOrThrow<StockParams>(stockParamsSchema, req.params);
-    const input = parseOrThrow<UpdateLowStockAlertInput>(
-      updateLowStockAlertSchema,
-      req.body,
-    );
-
-    const result = await inventoryService.updateLowStockAlert(
-      params.tenantId,
-      params.designId,
-      input,
       authReq.user,
     );
 

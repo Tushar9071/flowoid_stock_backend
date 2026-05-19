@@ -60,6 +60,10 @@ export const partyParamsSchema = tenantParamsSchema.extend({
   partyId: z.string().uuid("Party ID must be a valid UUID"),
 });
 
+export const partyOrderOutstandingQuerySchema = z.object({
+  includePaid: z.coerce.boolean().default(false),
+});
+
 const paymentAllocationSchema = z
   .object({
     orderId: z.string().uuid("Order ID must be a valid UUID"),
@@ -165,6 +169,7 @@ export const dailyCashFlowQuerySchema = z.object({
 export type TenantParams = z.infer<typeof tenantParamsSchema>;
 export type PaymentParams = z.infer<typeof paymentParamsSchema>;
 export type PartyParams = z.infer<typeof partyParamsSchema>;
+export type PartyOrderOutstandingQuery = z.infer<typeof partyOrderOutstandingQuerySchema>;
 export type CreateDealerPaymentInput = z.infer<typeof createDealerPaymentSchema>;
 export type CreateSupplierPaymentInput = z.infer<typeof createSupplierPaymentSchema>;
 export type UpdatePaymentStatusInput = z.infer<typeof updatePaymentStatusSchema>;

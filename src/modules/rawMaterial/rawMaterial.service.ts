@@ -74,8 +74,6 @@ const ISSUANCE_INCLUDE = {
 	materialType: { select: MATERIAL_TYPE_SELECT },
 } as const;
 
-const LOW_STOCK_THRESHOLD = new Prisma.Decimal(10);
-
 const normalizeOptionalString = (value?: string): string | null => {
 	const trimmed = value?.trim();
 	return trimmed ? trimmed : null;
@@ -135,7 +133,7 @@ const findMaterialTypeOrThrow = async (tenantId: string, materialTypeId: string)
 };
 
 const getMaterialTypeStock = async (tenantId: string, materialTypeId: string) => {
-	const [purchases, issuances] = await Promise.all([
+	const [purchases, issued, returned] = await Promise.all([
 		prisma.rawMaterialPurchase.aggregate({
 			where: {
 				tenantId,
@@ -149,14 +147,23 @@ const getMaterialTypeStock = async (tenantId: string, materialTypeId: string) =>
 			where: {
 				tenantId,
 				materialTypeId,
+				movementType: "ISSUE",
+			},
+			_sum: { quantity: true },
+		}),
+		prisma.rawMaterialIssuance.aggregate({
+			where: {
+				tenantId,
+				materialTypeId,
+				movementType: "RETURN",
 			},
 			_sum: { quantity: true },
 		}),
 	]);
 
-	return decimalOrZero(purchases._sum.quantity).minus(
-		decimalOrZero(issuances._sum.quantity),
-	);
+	return decimalOrZero(purchases._sum.quantity)
+		.minus(decimalOrZero(issued._sum.quantity))
+		.plus(decimalOrZero(returned._sum.quantity));
 };
 
 const attachStockToMaterialTypes = async (
@@ -167,7 +174,7 @@ const attachStockToMaterialTypes = async (
 
 	const typeIds = types.map((type) => type.id);
 
-	const [purchaseSums, issuanceSums] = await Promise.all([
+	const [purchaseSums, movementSums] = await Promise.all([
 		prisma.rawMaterialPurchase.groupBy({
 			by: ["materialTypeId"],
 			where: {
@@ -179,7 +186,7 @@ const attachStockToMaterialTypes = async (
 			_sum: { quantity: true },
 		}),
 		prisma.rawMaterialIssuance.groupBy({
-			by: ["materialTypeId"],
+			by: ["materialTypeId", "movementType"],
 			where: {
 				tenantId,
 				materialTypeId: { in: typeIds },
@@ -193,15 +200,21 @@ const attachStockToMaterialTypes = async (
 		purchaseMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
 	}
 
-	const issuanceMap = new Map<string, Prisma.Decimal>();
-	for (const row of issuanceSums) {
-		issuanceMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
+	const issuedMap = new Map<string, Prisma.Decimal>();
+	const returnedMap = new Map<string, Prisma.Decimal>();
+	for (const row of movementSums) {
+		if (row.movementType === "RETURN") {
+			returnedMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
+		} else {
+			issuedMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
+		}
 	}
 
 	return types.map((type) => {
 		const purchased = purchaseMap.get(type.id) ?? new Prisma.Decimal(0);
-		const issued = issuanceMap.get(type.id) ?? new Prisma.Decimal(0);
-		const currentStock = purchased.minus(issued);
+		const issued = issuedMap.get(type.id) ?? new Prisma.Decimal(0);
+		const returned = returnedMap.get(type.id) ?? new Prisma.Decimal(0);
+		const currentStock = purchased.minus(issued).plus(returned);
 		return {
 			...type,
 			currentStock,
@@ -591,7 +604,7 @@ export const softDeletePurchase = async (
 		throw notFoundError("Purchase not found");
 	}
 
-	const [receivedTotals, issuanceTotals] = await Promise.all([
+	const [receivedTotals, issueTotals, returnTotals] = await Promise.all([
 		prisma.rawMaterialPurchase.aggregate({
 			where: {
 				tenantId,
@@ -605,18 +618,29 @@ export const softDeletePurchase = async (
 			where: {
 				tenantId,
 				materialTypeId: purchase.materialTypeId,
+				movementType: "ISSUE",
+			},
+			_sum: { quantity: true },
+		}),
+		prisma.rawMaterialIssuance.aggregate({
+			where: {
+				tenantId,
+				materialTypeId: purchase.materialTypeId,
+				movementType: "RETURN",
 			},
 			_sum: { quantity: true },
 		}),
 	]);
 
 	const totalReceived = decimalOrZero(receivedTotals._sum.quantity);
-	const totalIssued = decimalOrZero(issuanceTotals._sum.quantity);
+	const netIssued = decimalOrZero(issueTotals._sum.quantity).minus(
+		decimalOrZero(returnTotals._sum.quantity),
+	);
 	const removableQuantity =
 		purchase.status === "RECEIVED" ? purchase.quantity : new Prisma.Decimal(0);
 	const remainingIfDeleted = totalReceived.minus(removableQuantity);
 
-	if (totalIssued.gt(remainingIfDeleted)) {
+	if (netIssued.gt(remainingIfDeleted)) {
 		throw validationError(
 			"Cannot delete purchase because issued quantity exceeds remaining stock",
 		);
@@ -654,7 +678,7 @@ export const getRawMaterialStock = async (
 
 	const typeIds = types.map((type) => type.id);
 
-	const [purchaseSums, issuanceSums] = await Promise.all([
+	const [purchaseSums, movementSums] = await Promise.all([
 		prisma.rawMaterialPurchase.groupBy({
 			by: ["materialTypeId"],
 			where: {
@@ -666,7 +690,7 @@ export const getRawMaterialStock = async (
 			_sum: { quantity: true },
 		}),
 		prisma.rawMaterialIssuance.groupBy({
-			by: ["materialTypeId"],
+			by: ["materialTypeId", "movementType"],
 			where: {
 				tenantId,
 				materialTypeId: { in: typeIds },
@@ -680,15 +704,21 @@ export const getRawMaterialStock = async (
 		purchaseMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
 	}
 
-	const issuanceMap = new Map<string, Prisma.Decimal>();
-	for (const row of issuanceSums) {
-		issuanceMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
+	const issuedMap = new Map<string, Prisma.Decimal>();
+	const returnedMap = new Map<string, Prisma.Decimal>();
+	for (const row of movementSums) {
+		if (row.movementType === "RETURN") {
+			returnedMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
+		} else {
+			issuedMap.set(row.materialTypeId, decimalOrZero(row._sum.quantity));
+		}
 	}
 
 	const stock = types.map((type) => {
 		const totalPurchased = purchaseMap.get(type.id) ?? new Prisma.Decimal(0);
-		const totalIssued = issuanceMap.get(type.id) ?? new Prisma.Decimal(0);
-		const currentStock = totalPurchased.minus(totalIssued);
+		const totalIssued = issuedMap.get(type.id) ?? new Prisma.Decimal(0);
+		const totalReturned = returnedMap.get(type.id) ?? new Prisma.Decimal(0);
+		const currentStock = totalPurchased.minus(totalIssued).plus(totalReturned);
 
 		return {
 			materialTypeId: type.id,
@@ -696,8 +726,8 @@ export const getRawMaterialStock = async (
 			unit: type.unit,
 			totalPurchased,
 			totalIssued,
+			totalReturned,
 			currentStock,
-			isLow: currentStock.lt(LOW_STOCK_THRESHOLD),
 		};
 	});
 

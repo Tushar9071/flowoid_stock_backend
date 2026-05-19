@@ -13,6 +13,8 @@ router.get("/aging-report", ctrl.getAgingReport);
 
 router.get("/cashflow", ctrl.getDailyCashFlow);
 
+router.get("/party/:partyId/order-outstanding", ctrl.getPartyOrderOutstanding);
+
 router.get("/party/:partyId/outstanding", ctrl.getPartyOutstanding);
 
 router.post("/dealer", ctrl.createDealerPayment);

@@ -65,6 +65,7 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
+app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
 app.use(collectApiMetrics);
 app.use(requestLogger);
 

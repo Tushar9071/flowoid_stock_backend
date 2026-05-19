@@ -13,6 +13,7 @@ import type {
   CreateSupplierPaymentInput,
   DailyCashFlowQuery,
   ListPaymentsQuery,
+  PartyOrderOutstandingQuery,
   UpdatePaymentStatusInput,
 } from "./payments.validation";
 
@@ -444,6 +445,7 @@ export const updatePaymentStatus = async (
         amount: true,
         paymentDate: true,
         paymentNature: true,
+        paymentMethod: true,
         paymentStatus: true,
         referenceNumber: true,
       },
@@ -455,6 +457,10 @@ export const updatePaymentStatus = async (
 
     if (payment.paymentStatus === input.paymentStatus) {
       return;
+    }
+
+    if (input.paymentStatus === "BOUNCED" && payment.paymentMethod === "CASH") {
+      throw validationError("Cash payments cannot be marked as bounced");
     }
 
     if (
@@ -571,6 +577,190 @@ export const getPartyOutstanding = async (
     totalInvoiced: decimalOrZero(saleTotals._sum.debitAmount),
     totalReceived: decimalOrZero(paymentTotals._sum.creditAmount),
     openingBalance,
+  };
+};
+
+export const getPartyOrderOutstanding = async (
+  tenantId: string,
+  partyId: string,
+  query: PartyOrderOutstandingQuery,
+  currentUser: CurrentUser,
+) => {
+  await assertTenantAccess(tenantId, currentUser);
+  const party = await findPartyOrThrow(prisma, tenantId, partyId);
+
+  if (party.type !== "DEALER") {
+    throw validationError("Order-wise outstanding is available only for dealer parties");
+  }
+
+  const outstanding = await getPartyOutstanding(tenantId, partyId, currentUser);
+  const orders = await prisma.order.findMany({
+    where: {
+      tenantId,
+      dealerId: partyId,
+      deletedAt: null,
+      status: { in: ["PARTIALLY_DISPATCHED", "DISPATCHED"] },
+    },
+    orderBy: [{ dispatchedAt: "desc" }, { orderDate: "desc" }, { id: "desc" }],
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      orderDate: true,
+      dueDate: true,
+      dispatchedAt: true,
+      subtotalAmount: true,
+      discountAmount: true,
+      totalAmount: true,
+      payments: {
+        where: {
+          payment: {
+            paymentStatus: { notIn: ["BOUNCED", "CANCELLED"] },
+          },
+        },
+        include: {
+          payment: {
+            select: {
+              id: true,
+              paymentMethod: true,
+              paymentStatus: true,
+              paymentDate: true,
+              referenceNumber: true,
+              bankName: true,
+              amount: true,
+              notes: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const orderRows = orders
+    .map((order) => {
+      const paidAmount = order.payments.reduce(
+        (sum, allocation) => sum.plus(allocation.amount),
+        new Prisma.Decimal(0),
+      );
+      const pendingAmount = order.totalAmount.minus(paidAmount);
+      const paymentStatus =
+        paidAmount.lte(0) ? "UNPAID" : pendingAmount.gt(0) ? "PARTIALLY_PAID" : "PAID";
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderStatus: order.status,
+        orderDate: order.orderDate,
+        dueDate: order.dueDate,
+        dispatchedAt: order.dispatchedAt,
+        subtotalAmount: order.subtotalAmount,
+        discountAmount: order.discountAmount,
+        totalAmount: order.totalAmount,
+        paidAmount,
+        pendingAmount,
+        paymentStatus,
+        payments: order.payments
+          .sort(
+            (a, b) =>
+              a.payment.paymentDate.getTime() - b.payment.paymentDate.getTime() ||
+              a.payment.id.localeCompare(b.payment.id),
+          )
+          .map((allocation) => ({
+            allocationId: allocation.id,
+            paymentId: allocation.paymentId,
+            allocatedAmount: allocation.amount,
+            paymentAmount: allocation.payment.amount,
+            paymentDate: allocation.payment.paymentDate,
+            paymentMethod: allocation.payment.paymentMethod,
+            paymentStatus: allocation.payment.paymentStatus,
+            referenceNumber: allocation.payment.referenceNumber,
+            bankName: allocation.payment.bankName,
+            notes: allocation.payment.notes,
+          })),
+      };
+    })
+    .filter((order) => query.includePaid || order.pendingAmount.gt(0));
+
+  const dealerPayments = await prisma.payment.findMany({
+    where: {
+      tenantId,
+      partyId,
+      paymentNature: { in: ["DEALER_RECEIPT", "DEALER_ADVANCE"] },
+      paymentStatus: { notIn: ["BOUNCED", "CANCELLED"] },
+    },
+    select: {
+      id: true,
+      amount: true,
+      paymentDate: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      referenceNumber: true,
+      bankName: true,
+      notes: true,
+      allocations: {
+        select: {
+          amount: true,
+        },
+      },
+    },
+    orderBy: [{ paymentDate: "asc" }, { id: "asc" }],
+  });
+
+  const unallocatedCredits = dealerPayments
+    .map((payment) => {
+      const allocatedAmount = payment.allocations.reduce(
+        (sum, allocation) => sum.plus(allocation.amount),
+        new Prisma.Decimal(0),
+      );
+      const unallocatedAmount = payment.amount.minus(allocatedAmount);
+
+      return {
+        paymentId: payment.id,
+        paymentDate: payment.paymentDate,
+        paymentMethod: payment.paymentMethod,
+        paymentStatus: payment.paymentStatus,
+        referenceNumber: payment.referenceNumber,
+        bankName: payment.bankName,
+        paymentAmount: payment.amount,
+        allocatedAmount,
+        unallocatedAmount,
+        notes: payment.notes,
+      };
+    })
+    .filter((payment) => payment.unallocatedAmount.gt(0));
+
+  const openingBalanceAmount =
+    party.openingBalanceType === "RECEIVABLE"
+      ? party.openingBalance
+      : party.openingBalance.mul(-1);
+  const totalOrderPending = orderRows.reduce(
+    (sum, order) => sum.plus(order.pendingAmount),
+    new Prisma.Decimal(0),
+  );
+  const totalUnallocatedCredits = unallocatedCredits.reduce(
+    (sum, payment) => sum.plus(payment.unallocatedAmount),
+    new Prisma.Decimal(0),
+  );
+
+  return {
+    party,
+    openingBalance: {
+      amount: party.openingBalance,
+      type: party.openingBalanceType,
+      date: party.openingBalanceDate,
+      receivableImpact: openingBalanceAmount.gt(0) ? openingBalanceAmount : new Prisma.Decimal(0),
+      payableImpact: openingBalanceAmount.lt(0) ? openingBalanceAmount.abs() : new Prisma.Decimal(0),
+    },
+    summary: {
+      ledgerOutstanding: outstanding.outstandingAmount,
+      totalOrderPending,
+      totalUnallocatedCredits,
+      totalInvoiced: outstanding.totalInvoiced,
+      totalReceived: outstanding.totalReceived,
+      displayedOrders: orderRows.length,
+    },
+    orders: orderRows,
+    unallocatedCredits,
   };
 };
 

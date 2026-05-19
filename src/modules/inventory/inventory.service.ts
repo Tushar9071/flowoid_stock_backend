@@ -7,12 +7,13 @@ import {
 } from "../../common/errors/app-error";
 import prisma from "../../lib/prisma";
 
+import { syncInventoryStock } from "./inventory-stock";
+
 import type {
   CreatePackagingBatchInput,
   CreateStockAdjustmentInput,
   ListPackagingBatchesQuery,
   ListStockQuery,
-  UpdateLowStockAlertInput,
 } from "./inventory.validation";
 
 type CurrentUser = {
@@ -30,7 +31,7 @@ const DESIGN_SELECT = {
   designCode: true,
   name: true,
   status: true,
-  salePricePerDozen: true,
+  salePriceRs: true,
   deletedAt: true,
   category: {
     select: {
@@ -141,179 +142,19 @@ const findDesignOrThrow = async (
   return design;
 };
 
-const sumAdjustments = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-  type: "UNPACKAGED" | "PACKAGED",
-) => {
-  const result = await client.inventoryAdjustment.aggregate({
-    where: {
-      tenantId,
-      inventoryStock: {
-        is: {
-          tenantId,
-          designId,
-        },
-      },
-      type,
-    },
-    _sum: {
-      adjustment: true,
-    },
-  });
-
-  return result._sum.adjustment ?? 0;
-};
-
-const getDispatchedDozens = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-) => {
-  const result = await client.orderDispatchItem.aggregate({
-    where: {
-      tenantId,
-      orderItem: {
-        is: {
-          tenantId,
-          designId,
-        },
-      },
-    },
-    _sum: {
-      dozensDispatched: true,
-    },
-  });
-
-  return result._sum?.dozensDispatched ?? 0;
-};
-
-const calculateStockTotals = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-) => {
-  const [
-    goodsReturns,
-    packagingPieces,
-    packagingDozens,
-    unpackagedAdjustments,
-    packagedAdjustments,
-    dispatchedDozens,
-  ] = await Promise.all([
-    client.goodsReturn.aggregate({
-      where: {
-        tenantId,
-        assignment: {
-          is: {
-            tenantId,
-            designId,
-          },
-        },
-      },
-      _sum: {
-        acceptedPieces: true,
-      },
-    }),
-    client.packagingBatch.aggregate({
-      where: {
-        tenantId,
-        inventoryStock: {
-          is: {
-            tenantId,
-            designId,
-          },
-        },
-      },
-      _sum: {
-        piecesUsed: true,
-      },
-    }),
-    client.packagingBatch.aggregate({
-      where: {
-        tenantId,
-        inventoryStock: {
-          is: {
-            tenantId,
-            designId,
-          },
-        },
-      },
-      _sum: {
-        dozensPackaged: true,
-      },
-    }),
-    sumAdjustments(client, tenantId, designId, "UNPACKAGED"),
-    sumAdjustments(client, tenantId, designId, "PACKAGED"),
-    getDispatchedDozens(client, tenantId, designId),
-  ]);
-
-  const unpackagedPieces =
-    (goodsReturns._sum.acceptedPieces ?? 0) +
-    unpackagedAdjustments -
-    (packagingPieces._sum.piecesUsed ?? 0);
-  const packagedDozens =
-    (packagingDozens._sum.dozensPackaged ?? 0) +
-    packagedAdjustments -
-    dispatchedDozens;
-
-  return {
-    unpackagedPieces,
-    packagedDozens,
-  };
-};
-
-const syncInventoryStock = async (
+const syncInventoryStockWithInclude = async (
   client: DbClient,
   tenantId: string,
   designId: string,
 ) => {
   await findDesignOrThrow(client, tenantId, designId);
+  await syncInventoryStock(client, tenantId, designId);
 
-  const existingStock = await client.inventoryStock.findUnique({
+  return client.inventoryStock.findUniqueOrThrow({
     where: { designId },
-    select: {
-      lowStockAlertAt: true,
-    },
-  });
-  const totals = await calculateStockTotals(client, tenantId, designId);
-
-  if (totals.unpackagedPieces < 0) {
-    throw validationError(
-      `Inventory stock cannot be negative. Current unpackaged stock: ${totals.unpackagedPieces} pieces`,
-    );
-  }
-
-  if (totals.packagedDozens < 0) {
-    throw validationError(
-      `Inventory stock cannot be negative. Current packaged stock: ${totals.packagedDozens} dozens`,
-    );
-  }
-
-  return client.inventoryStock.upsert({
-    where: { designId },
-    create: {
-      tenantId,
-      designId,
-      unpackagedPieces: totals.unpackagedPieces,
-      packagedDozens: totals.packagedDozens,
-      lowStockAlertAt: existingStock?.lowStockAlertAt ?? 0,
-    },
-    update: {
-      unpackagedPieces: totals.unpackagedPieces,
-      packagedDozens: totals.packagedDozens,
-    },
     include: STOCK_INCLUDE,
   });
 };
-
-const withStockFlags = <T extends { packagedDozens: number; lowStockAlertAt: number }>(
-  stock: T,
-) => ({
-  ...stock,
-  isLow: stock.lowStockAlertAt > 0 && stock.packagedDozens < stock.lowStockAlertAt,
-});
 
 const getActivityDesignIds = async (tenantId: string) => {
   const [assignments, batches, adjustments, stocks, dispatchItems] = await Promise.all([
@@ -404,17 +245,13 @@ export const getStockOverview = async (
   });
 
   const syncedStocks = await Promise.all(
-    designs.map((design) => syncInventoryStock(prisma, tenantId, design.id)),
+    designs.map((design) => syncInventoryStockWithInclude(prisma, tenantId, design.id)),
   );
 
-  const filteredStocks = syncedStocks
-    .map(withStockFlags)
-    .filter((stock) => query.isLow === undefined || stock.isLow === query.isLow);
-
-  const totalItems = filteredStocks.length;
+  const totalItems = syncedStocks.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / query.limit));
   const skip = (query.page - 1) * query.limit;
-  const items = filteredStocks.slice(skip, skip + query.limit);
+  const items = syncedStocks.slice(skip, skip + query.limit);
 
   return {
     items,
@@ -436,7 +273,7 @@ export const getStockByDesign = async (
 ) => {
   await assertTenantAccess(tenantId, currentUser);
 
-  const stock = await syncInventoryStock(prisma, tenantId, designId);
+  const stock = await syncInventoryStockWithInclude(prisma, tenantId, designId);
   const packagingBatches = await prisma.packagingBatch.findMany({
     where: {
       tenantId,
@@ -452,29 +289,9 @@ export const getStockByDesign = async (
   });
 
   return {
-    ...withStockFlags(stock),
+    ...stock,
     packagingBatches: packagingBatches.map(formatPackagingBatch),
   };
-};
-
-export const getLowStockAlerts = async (
-  tenantId: string,
-  currentUser: CurrentUser,
-) => {
-  await assertTenantAccess(tenantId, currentUser);
-
-  const activityDesignIds = await getActivityDesignIds(tenantId);
-  const stocks = await Promise.all(
-    activityDesignIds.map((designId) => syncInventoryStock(prisma, tenantId, designId)),
-  );
-
-  return stocks
-    .filter((stock) => stock.lowStockAlertAt > 0 && stock.packagedDozens < stock.lowStockAlertAt)
-    .map((stock) => ({
-      ...stock,
-      deficitDozens: stock.lowStockAlertAt - stock.packagedDozens,
-    }))
-    .sort((a, b) => b.deficitDozens - a.deficitDozens);
 };
 
 export const createPackagingBatch = async (
@@ -486,12 +303,11 @@ export const createPackagingBatch = async (
   await assertTenantAccess(tenantId, currentUser);
 
   return prisma.$transaction(async (tx) => {
-    const stock = await syncInventoryStock(tx, tenantId, input.designId);
-    const piecesUsed = input.dozensPackaged * 12;
+    const stock = await syncInventoryStockWithInclude(tx, tenantId, input.designId);
 
-    if (stock.unpackagedPieces < piecesUsed) {
+    if (stock.unpackagedPieces < input.piecesPackaged) {
       throw validationError(
-        `Insufficient unpackaged stock. Available: ${stock.unpackagedPieces} pieces, Required: ${piecesUsed} pieces`,
+        `Insufficient unpackaged stock. Available: ${stock.unpackagedPieces} pieces, Required: ${input.piecesPackaged} pieces`,
       );
     }
 
@@ -499,19 +315,18 @@ export const createPackagingBatch = async (
       data: {
         tenantId,
         inventoryStockId: stock.id,
-        dozensPackaged: input.dozensPackaged,
-        piecesUsed,
+        piecesPackaged: input.piecesPackaged,
         packedById,
         notes: normalizeOptionalString(input.notes),
       },
       include: PACKAGING_BATCH_INCLUDE,
     });
 
-    const updatedStock = await syncInventoryStock(tx, tenantId, input.designId);
+    const updatedStock = await syncInventoryStockWithInclude(tx, tenantId, input.designId);
 
     return {
       batch: formatPackagingBatch(batch),
-      stock: withStockFlags(updatedStock),
+      stock: updatedStock,
     };
   });
 };
@@ -593,26 +408,6 @@ export const getPackagingBatchById = async (
   return formatPackagingBatch(batch);
 };
 
-export const updateLowStockAlert = async (
-  tenantId: string,
-  designId: string,
-  input: UpdateLowStockAlertInput,
-  currentUser: CurrentUser,
-) => {
-  await assertTenantAccess(tenantId, currentUser);
-  await syncInventoryStock(prisma, tenantId, designId);
-
-  const stock = await prisma.inventoryStock.update({
-    where: { designId },
-    data: {
-      lowStockAlertAt: input.lowStockAlertAt,
-    },
-    include: STOCK_INCLUDE,
-  });
-
-  return withStockFlags(stock);
-};
-
 export const createStockAdjustment = async (
   tenantId: string,
   designId: string,
@@ -623,15 +418,15 @@ export const createStockAdjustment = async (
   await assertTenantAccess(tenantId, currentUser);
 
   return prisma.$transaction(async (tx) => {
-    const stock = await syncInventoryStock(tx, tenantId, designId);
+    const stock = await syncInventoryStockWithInclude(tx, tenantId, designId);
     const nextUnpackagedPieces =
       input.type === "UNPACKAGED"
         ? stock.unpackagedPieces + input.adjustment
         : stock.unpackagedPieces;
-    const nextPackagedDozens =
+    const nextPackagedPieces =
       input.type === "PACKAGED"
-        ? stock.packagedDozens + input.adjustment
-        : stock.packagedDozens;
+        ? stock.packagedPieces + input.adjustment
+        : stock.packagedPieces;
 
     if (nextUnpackagedPieces < 0) {
       throw validationError(
@@ -639,9 +434,9 @@ export const createStockAdjustment = async (
       );
     }
 
-    if (nextPackagedDozens < 0) {
+    if (nextPackagedPieces < 0) {
       throw validationError(
-        `Adjustment would make packaged stock negative. Available: ${stock.packagedDozens} dozens`,
+        `Adjustment would make packaged stock negative. Available: ${stock.packagedPieces} pieces`,
       );
     }
 
@@ -656,11 +451,11 @@ export const createStockAdjustment = async (
       },
     });
 
-    const updatedStock = await syncInventoryStock(tx, tenantId, designId);
+    const updatedStock = await syncInventoryStockWithInclude(tx, tenantId, designId);
 
     return {
       adjustment,
-      stock: withStockFlags(updatedStock),
+      stock: updatedStock,
     };
   });
 };

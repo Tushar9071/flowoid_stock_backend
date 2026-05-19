@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import fs from "fs/promises";
 import { z } from "zod";
 
 import type { AuthenticatedRequest } from "../../types/auth.types";
 import { validationError } from "../../common/errors/app-error";
+import { toLocalDesignImagePath } from "../../middleware/upload.middleware";
 import { successResponse } from "../../utils/response";
 
 import * as designsService from "./designs.service";
@@ -196,10 +198,15 @@ export const createDesign = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
+  const uploadedImage = req.file;
+
   try {
     const authReq = req as AuthenticatedRequest;
     const params = parseOrThrow<TenantParams>(tenantParamsSchema, req.params);
-    const input = parseOrThrow<CreateDesignInput>(createDesignSchema, req.body);
+    const input = parseOrThrow<CreateDesignInput>(createDesignSchema, {
+      ...req.body,
+      imageUrl: uploadedImage ? toLocalDesignImagePath(uploadedImage.path) : undefined,
+    });
 
     const result = await designsService.createDesign(
       params.tenantId,
@@ -210,6 +217,10 @@ export const createDesign = async (
 
     successResponse(res, result, 201);
   } catch (error) {
+    if (uploadedImage) {
+      await fs.unlink(uploadedImage.path).catch(() => undefined);
+    }
+
     next(error);
   }
 };
@@ -219,10 +230,15 @@ export const updateDesign = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
+  const uploadedImage = req.file;
+
   try {
     const authReq = req as AuthenticatedRequest;
     const params = parseOrThrow<DesignParams>(designParamsSchema, req.params);
-    const input = parseOrThrow<UpdateDesignInput>(updateDesignSchema, req.body);
+    const input = parseOrThrow<UpdateDesignInput>(updateDesignSchema, {
+      ...req.body,
+      imageUrl: uploadedImage ? toLocalDesignImagePath(uploadedImage.path) : undefined,
+    });
 
     const result = await designsService.updateDesign(
       params.tenantId,
@@ -233,6 +249,10 @@ export const updateDesign = async (
 
     successResponse(res, result);
   } catch (error) {
+    if (uploadedImage) {
+      await fs.unlink(uploadedImage.path).catch(() => undefined);
+    }
+
     next(error);
   }
 };

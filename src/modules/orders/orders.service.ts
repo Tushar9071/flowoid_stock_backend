@@ -6,6 +6,7 @@ import {
   validationError,
 } from "../../common/errors/app-error";
 import prisma from "../../lib/prisma";
+import { syncInventoryStock } from "../inventory/inventory-stock";
 
 import type {
   AddOrderItemInput,
@@ -57,8 +58,8 @@ const ORDER_LIST_INCLUDE = {
   },
   items: {
     select: {
-      quantityDozens: true,
-      dispatchedDozens: true,
+      quantityPieces: true,
+      dispatchedPieces: true,
     },
   },
 } as const;
@@ -133,8 +134,8 @@ const addDays = (date: Date, days: number): Date => {
   return next;
 };
 
-const getRemainingDozens = (item: { quantityDozens: number; dispatchedDozens: number }) =>
-  item.quantityDozens - item.dispatchedDozens;
+const getRemainingPieces = (item: { quantityPieces: number; dispatchedPieces: number }) =>
+  item.quantityPieces - item.dispatchedPieces;
 
 const DISPATCHED_ORDER_STATUSES = ["DISPATCHED", "PARTIALLY_DISPATCHED"] as const;
 
@@ -155,9 +156,9 @@ const getDaysOverdue = (dueDate: Date | null): number => {
 };
 
 const withOrderComputedFields = <T extends OrderListItem | OrderDetails>(order: T) => {
-  const totalDozens = order.items.reduce((sum, item) => sum + item.quantityDozens, 0);
-  const dispatchedDozens = order.items.reduce(
-    (sum, item) => sum + item.dispatchedDozens,
+  const totalPieces = order.items.reduce((sum, item) => sum + item.quantityPieces, 0);
+  const dispatchedPieces = order.items.reduce(
+    (sum, item) => sum + item.dispatchedPieces,
     0,
   );
 
@@ -165,11 +166,11 @@ const withOrderComputedFields = <T extends OrderListItem | OrderDetails>(order: 
     ...order,
     items: order.items.map((item) => ({
       ...item,
-      remainingDozens: getRemainingDozens(item),
+      remainingPieces: getRemainingPieces(item),
     })),
-    totalDozens,
-    dispatchedDozens,
-    remainingDozens: totalDozens - dispatchedDozens,
+    totalPieces,
+    dispatchedPieces,
+    remainingPieces: totalPieces - dispatchedPieces,
     isOverdue: isOrderOverdue(order),
     outstandingAmount: order.status === "DISPATCHED" ? order.totalAmount : new Prisma.Decimal(0),
   };
@@ -273,7 +274,7 @@ const getDesignsOrThrow = async (client: DbClient, tenantId: string, designIds: 
       designCode: true,
       name: true,
       status: true,
-      salePricePerDozen: true,
+      salePriceRs: true,
     },
   });
 
@@ -290,8 +291,8 @@ const getDesignsOrThrow = async (client: DbClient, tenantId: string, designIds: 
   return new Map(designs.map((design) => [design.id, design]));
 };
 
-const calculateLineTotal = (quantityDozens: number, pricePerDozen: Prisma.Decimal) =>
-  new Prisma.Decimal(quantityDozens).mul(pricePerDozen);
+const calculateLineTotal = (quantityPieces: number, pricePerPiece: Prisma.Decimal) =>
+  new Prisma.Decimal(quantityPieces).mul(pricePerPiece);
 
 const recalculateOrderTotals = async (tx: TransactionClient, orderId: string) => {
   const order = await tx.order.findUnique({
@@ -384,181 +385,7 @@ const assertDraftOrder = (order: { status: string }) => {
   }
 };
 
-const getDispatchedDozens = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-) => {
-  const dispatched = await client.orderDispatchItem.aggregate({
-    where: {
-      tenantId,
-      orderItem: {
-        is: {
-          tenantId,
-          designId,
-        },
-      },
-    },
-    _sum: {
-      dozensDispatched: true,
-    },
-  });
-
-  return dispatched._sum?.dozensDispatched ?? 0;
-};
-
-const sumAdjustments = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-  type: "UNPACKAGED" | "PACKAGED",
-) => {
-  const result = await client.inventoryAdjustment.aggregate({
-    where: {
-      tenantId,
-      inventoryStock: {
-        is: {
-          tenantId,
-          designId,
-        },
-      },
-      type,
-    },
-    _sum: {
-      adjustment: true,
-    },
-  });
-
-  return result._sum.adjustment ?? 0;
-};
-
-const calculateStockTotals = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-) => {
-  const [
-    goodsReturns,
-    packagingPieces,
-    packagingDozens,
-    unpackagedAdjustments,
-    packagedAdjustments,
-    dispatchedDozens,
-  ] = await Promise.all([
-    client.goodsReturn.aggregate({
-      where: {
-        tenantId,
-        assignment: {
-          is: {
-            tenantId,
-            designId,
-          },
-        },
-      },
-      _sum: {
-        acceptedPieces: true,
-      },
-    }),
-    client.packagingBatch.aggregate({
-      where: {
-        tenantId,
-        inventoryStock: {
-          is: {
-            tenantId,
-            designId,
-          },
-        },
-      },
-      _sum: {
-        piecesUsed: true,
-      },
-    }),
-    client.packagingBatch.aggregate({
-      where: {
-        tenantId,
-        inventoryStock: {
-          is: {
-            tenantId,
-            designId,
-          },
-        },
-      },
-      _sum: {
-        dozensPackaged: true,
-      },
-    }),
-    sumAdjustments(client, tenantId, designId, "UNPACKAGED"),
-    sumAdjustments(client, tenantId, designId, "PACKAGED"),
-    getDispatchedDozens(client, tenantId, designId),
-  ]);
-
-  return {
-    unpackagedPieces:
-      (goodsReturns._sum.acceptedPieces ?? 0) +
-      unpackagedAdjustments -
-      (packagingPieces._sum.piecesUsed ?? 0),
-    packagedDozens:
-      (packagingDozens._sum.dozensPackaged ?? 0) +
-      packagedAdjustments -
-      dispatchedDozens,
-  };
-};
-
-const syncInventoryStock = async (
-  client: DbClient,
-  tenantId: string,
-  designId: string,
-) => {
-  const design = await client.design.findFirst({
-    where: {
-      id: designId,
-      tenantId,
-      deletedAt: null,
-    },
-    select: { id: true },
-  });
-
-  if (!design) {
-    throw notFoundError("Design not found");
-  }
-
-  const existingStock = await client.inventoryStock.findUnique({
-    where: { designId },
-    select: {
-      lowStockAlertAt: true,
-    },
-  });
-  const totals = await calculateStockTotals(client, tenantId, designId);
-
-  if (totals.unpackagedPieces < 0) {
-    throw validationError(
-      `Inventory stock cannot be negative. Current unpackaged stock: ${totals.unpackagedPieces} pieces`,
-    );
-  }
-
-  if (totals.packagedDozens < 0) {
-    throw validationError(
-      `Inventory stock cannot be negative. Current packaged stock: ${totals.packagedDozens} dozens`,
-    );
-  }
-
-  return client.inventoryStock.upsert({
-    where: { designId },
-    create: {
-      tenantId,
-      designId,
-      unpackagedPieces: totals.unpackagedPieces,
-      packagedDozens: totals.packagedDozens,
-      lowStockAlertAt: existingStock?.lowStockAlertAt ?? 0,
-    },
-    update: {
-      unpackagedPieces: totals.unpackagedPieces,
-      packagedDozens: totals.packagedDozens,
-    },
-  });
-};
-
-const getReservedDozens = async (
+const getReservedPieces = async (
   client: DbClient,
   tenantId: string,
   designId: string,
@@ -574,12 +401,12 @@ const getReservedDozens = async (
       },
     },
     select: {
-      quantityDozens: true,
-      dispatchedDozens: true,
+      quantityPieces: true,
+      dispatchedPieces: true,
     },
   });
 
-  return items.reduce((sum, item) => sum + getRemainingDozens(item), 0);
+  return items.reduce((sum, item) => sum + getRemainingPieces(item), 0);
 };
 
 const validateStockForConfirmation = async (
@@ -592,17 +419,17 @@ const validateStockForConfirmation = async (
 
   for (const item of items) {
     const stock = await syncInventoryStock(client, tenantId, item.designId);
-    const reservedDozens = await getReservedDozens(client, tenantId, item.designId, orderId);
-    const availableDozens = stock.packagedDozens - reservedDozens;
+    const reservedPieces = await getReservedPieces(client, tenantId, item.designId, orderId);
+    const availablePieces = stock.packagedPieces - reservedPieces;
 
-    if (availableDozens < item.quantityDozens) {
+    if (availablePieces < item.quantityPieces) {
       shortages.push({
         designId: item.designId,
         designCode: item.design.designCode,
         designName: item.design.name,
-        requiredDozens: item.quantityDozens,
-        availableDozens,
-        shortageDozens: item.quantityDozens - availableDozens,
+        requiredPieces: item.quantityPieces,
+        availablePieces,
+        shortagePieces: item.quantityPieces - availablePieces,
       });
     }
   }
@@ -611,7 +438,7 @@ const validateStockForConfirmation = async (
     const message = shortages
       .map(
         (shortage) =>
-          `${shortage.designCode}: required ${shortage.requiredDozens}, available ${shortage.availableDozens}, short ${shortage.shortageDozens}`,
+          `${shortage.designCode}: required ${shortage.requiredPieces}, available ${shortage.availablePieces}, short ${shortage.shortagePieces}`,
       )
       .join("; ");
 
@@ -831,17 +658,17 @@ export const createOrder = async (
             throw notFoundError("Design not found");
           }
 
-          const pricePerDozen =
-            item.pricePerDozen !== undefined
-              ? new Prisma.Decimal(item.pricePerDozen)
-              : design.salePricePerDozen;
+          const pricePerPiece =
+            item.pricePerPiece !== undefined
+              ? new Prisma.Decimal(item.pricePerPiece)
+              : design.salePriceRs;
 
           return {
             tenantId,
             designId: item.designId,
-            quantityDozens: item.quantityDozens,
-            pricePerDozen,
-            lineTotal: calculateLineTotal(item.quantityDozens, pricePerDozen),
+            quantityPieces: item.quantityPieces,
+            pricePerPiece,
+            lineTotal: calculateLineTotal(item.quantityPieces, pricePerPiece),
             notes: normalizeOptionalString(item.notes),
           };
         });
@@ -1017,12 +844,12 @@ export const dispatchOrder = async (
       throw validationError("Only packed orders can be dispatched");
     }
 
-    const remainingItems = order.items.filter((item) => getRemainingDozens(item) > 0);
+    const remainingItems = order.items.filter((item) => getRemainingPieces(item) > 0);
     if (remainingItems.length === 0) {
-      throw validationError("Order has no remaining dozens to dispatch");
+      throw validationError("Order has no remaining pieces to dispatch");
     }
 
-    const inputItemMap = new Map(input.items?.map((item) => [item.itemId, item.dozens]));
+    const inputItemMap = new Map(input.items?.map((item) => [item.itemId, item.pieces]));
     const dispatchItems = input.items
       ? input.items.map((inputItem) => {
           const orderItem = order.items.find((item) => item.id === inputItem.itemId);
@@ -1030,21 +857,21 @@ export const dispatchOrder = async (
             throw notFoundError("Order item not found");
           }
 
-          const remainingDozens = getRemainingDozens(orderItem);
-          if (inputItem.dozens > remainingDozens) {
+          const remainingPieces = getRemainingPieces(orderItem);
+          if (inputItem.pieces > remainingPieces) {
             throw validationError(
-              `Cannot dispatch ${inputItem.dozens} dozens for ${orderItem.design.designCode}. Remaining: ${remainingDozens}`,
+              `Cannot dispatch ${inputItem.pieces} pieces for ${orderItem.design.designCode}. Remaining: ${remainingPieces}`,
             );
           }
 
           return {
             orderItem,
-            dozens: inputItem.dozens,
+            pieces: inputItem.pieces,
           };
         })
       : remainingItems.map((orderItem) => ({
           orderItem,
-          dozens: getRemainingDozens(orderItem),
+          pieces: getRemainingPieces(orderItem),
         }));
 
     if (input.items && inputItemMap.size === 0) {
@@ -1069,17 +896,17 @@ export const dispatchOrder = async (
 
     for (const dispatchItem of dispatchItems) {
       const stock = await syncInventoryStock(tx, tenantId, dispatchItem.orderItem.designId);
-      const reservedByOtherOrders = await getReservedDozens(
+      const reservedByOtherOrders = await getReservedPieces(
         tx,
         tenantId,
         dispatchItem.orderItem.designId,
         orderId,
       );
-      const availableForThisOrder = stock.packagedDozens - reservedByOtherOrders;
+      const availableForThisOrder = stock.packagedPieces - reservedByOtherOrders;
 
-      if (availableForThisOrder < dispatchItem.dozens) {
+      if (availableForThisOrder < dispatchItem.pieces) {
         throw validationError(
-          `Insufficient packaged stock for ${dispatchItem.orderItem.design.designCode}. Available: ${availableForThisOrder}, Required: ${dispatchItem.dozens}`,
+          `Insufficient packaged stock for ${dispatchItem.orderItem.design.designCode}. Available: ${availableForThisOrder}, Required: ${dispatchItem.pieces}`,
         );
       }
 
@@ -1089,22 +916,22 @@ export const dispatchOrder = async (
           dispatchId: dispatch.id,
           orderItemId: dispatchItem.orderItem.id,
           inventoryStockId: stock.id,
-          dozensDispatched: dispatchItem.dozens,
+          piecesDispatched: dispatchItem.pieces,
         },
       });
 
       await tx.orderItem.update({
         where: { id: dispatchItem.orderItem.id },
         data: {
-          dispatchedDozens: {
-            increment: dispatchItem.dozens,
+          dispatchedPieces: {
+            increment: dispatchItem.pieces,
           },
         },
       });
 
       touchedDesignIds.add(dispatchItem.orderItem.designId);
       dispatchSubtotal = dispatchSubtotal.plus(
-        toDecimal(dispatchItem.dozens).mul(dispatchItem.orderItem.pricePerDozen),
+        toDecimal(dispatchItem.pieces).mul(dispatchItem.orderItem.pricePerPiece),
       );
     }
 
@@ -1115,11 +942,11 @@ export const dispatchOrder = async (
     const updatedItems = await tx.orderItem.findMany({
       where: { orderId },
       select: {
-        quantityDozens: true,
-        dispatchedDozens: true,
+        quantityPieces: true,
+        dispatchedPieces: true,
       },
     });
-    const isFullyDispatched = updatedItems.every((item) => getRemainingDozens(item) === 0);
+    const isFullyDispatched = updatedItems.every((item) => getRemainingPieces(item) === 0);
     const existingSaleLedgerTotal = await getExistingSaleLedgerTotal(tx, order);
     const dispatchAmount = calculateDispatchAmount(
       order,
@@ -1200,19 +1027,19 @@ export const addOrderItem = async (
       throw notFoundError("Design not found");
     }
 
-    const pricePerDozen =
-      input.pricePerDozen !== undefined
-        ? new Prisma.Decimal(input.pricePerDozen)
-        : design.salePricePerDozen;
+    const pricePerPiece =
+      input.pricePerPiece !== undefined
+        ? new Prisma.Decimal(input.pricePerPiece)
+        : design.salePriceRs;
 
     await tx.orderItem.create({
       data: {
         tenantId,
         orderId,
         designId: input.designId,
-        quantityDozens: input.quantityDozens,
-        pricePerDozen,
-        lineTotal: calculateLineTotal(input.quantityDozens, pricePerDozen),
+        quantityPieces: input.quantityPieces,
+        pricePerPiece,
+        lineTotal: calculateLineTotal(input.quantityPieces, pricePerPiece),
         notes: normalizeOptionalString(input.notes),
       },
     });
@@ -1241,18 +1068,18 @@ export const updateOrderItem = async (
       throw notFoundError("Order item not found");
     }
 
-    const quantityDozens = input.quantityDozens ?? item.quantityDozens;
-    const pricePerDozen =
-      input.pricePerDozen !== undefined
-        ? new Prisma.Decimal(input.pricePerDozen)
-        : item.pricePerDozen;
+    const quantityPieces = input.quantityPieces ?? item.quantityPieces;
+    const pricePerPiece =
+      input.pricePerPiece !== undefined
+        ? new Prisma.Decimal(input.pricePerPiece)
+        : item.pricePerPiece;
 
     await tx.orderItem.update({
       where: { id: itemId },
       data: {
-        quantityDozens: input.quantityDozens,
-        pricePerDozen: input.pricePerDozen !== undefined ? pricePerDozen : undefined,
-        lineTotal: calculateLineTotal(quantityDozens, pricePerDozen),
+        quantityPieces: input.quantityPieces,
+        pricePerPiece: input.pricePerPiece !== undefined ? pricePerPiece : undefined,
+        lineTotal: calculateLineTotal(quantityPieces, pricePerPiece),
         notes: input.notes !== undefined ? normalizeOptionalString(input.notes) : undefined,
       },
     });
@@ -1346,7 +1173,7 @@ export const getDispatchSummary = async (
       trackingRef: dispatch.trackingRef,
       designCode: dispatchItem.orderItem.design.designCode,
       designName: dispatchItem.orderItem.design.name,
-      dispatchedDozens: dispatchItem.dozensDispatched,
+      dispatchedPieces: dispatchItem.piecesDispatched,
     })),
   );
 
@@ -1370,7 +1197,7 @@ export const getDispatchSummary = async (
       city: order.dealer.city,
     },
     items,
-    totalDozensDispatched: items.reduce((sum, item) => sum + item.dispatchedDozens, 0),
+    totalPiecesDispatched: items.reduce((sum, item) => sum + item.dispatchedPieces, 0),
     totalAmount: order.totalAmount,
     dispatches: order.dispatches.map((dispatch) => ({
       id: dispatch.id,
@@ -1382,7 +1209,7 @@ export const getDispatchSummary = async (
         id: dispatchItem.id,
         orderItemId: dispatchItem.orderItemId,
         inventoryStockId: dispatchItem.inventoryStockId,
-        dozensDispatched: dispatchItem.dozensDispatched,
+        piecesDispatched: dispatchItem.piecesDispatched,
         designCode: dispatchItem.orderItem.design.designCode,
         designName: dispatchItem.orderItem.design.name,
       })),

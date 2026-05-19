@@ -395,8 +395,8 @@ export const generateInvoice = async (
     items: order.items.map((item) => ({
       designCode: item.design.designCode,
       designName: item.design.name,
-      quantityDozens: item.quantityDozens,
-      pricePerDozen: money(item.pricePerDozen),
+      quantityPieces: item.quantityPieces,
+      pricePerPiece: money(item.pricePerPiece),
       lineTotal: money(item.lineTotal),
     })),
     subtotalAmount: money(order.subtotalAmount),
@@ -441,10 +441,10 @@ export const generateChallan = async (
     dispatch.items.map((item) => ({
       designCode: item.orderItem.design.designCode,
       designName: item.orderItem.design.name,
-      dozens: item.dozensDispatched,
+      pieces: item.piecesDispatched,
     })),
   );
-  const totalDozens = items.reduce((sum, item) => sum + item.dozens, 0);
+  const totalPieces = items.reduce((sum, item) => sum + item.pieces, 0);
   const documentNumber = `CH-${order.orderNumber}`;
   const pdfBuffer = await generateDocumentPdf("challan", {
     tenant: {
@@ -459,7 +459,7 @@ export const generateChallan = async (
     challanNumber: order.orderNumber,
     challanDate: formatDate(latestDispatch.dispatchedAt),
     items,
-    totalDozens,
+    totalPieces,
     transportMode: latestDispatch.transportMode,
     trackingRef: latestDispatch.trackingRef ?? "-",
   });

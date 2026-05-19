@@ -100,8 +100,13 @@ const WORKER_ASSIGNMENT_INCLUDE = {
       category: { select: CATEGORY_SELECT },
     },
   },
-  rawMaterialType: { select: RAW_MATERIAL_TYPE_SELECT },
-} as const;
+  rawMaterialIssuances: {
+    orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+    include: {
+      materialType: { select: RAW_MATERIAL_TYPE_SELECT },
+    },
+  },
+} satisfies Prisma.WorkerAssignmentInclude;
 
 const WORKER_PAYMENT_SELECT = {
   id: true,

@@ -490,11 +490,9 @@ export const createDesign = async (
       designCode: normalizedDesignCode,
       name: normalizeName(input.name),
       description: normalizeOptionalString(input.description),
-      material: normalizeOptionalString(input.material),
-      finish: normalizeOptionalString(input.finish),
       diamondCount: input.diamondCount,
       pieceRateRs: new Prisma.Decimal(input.pieceRateRs),
-      salePricePerDozen: new Prisma.Decimal(input.salePricePerDozen),
+      salePriceRs: new Prisma.Decimal(input.salePriceRs),
       imageUrl: normalizeOptionalString(input.imageUrl),
       status: input.status,
       notes: normalizeOptionalString(input.notes),
@@ -558,15 +556,11 @@ export const updateDesign = async (
       name: input.name ? normalizeName(input.name) : undefined,
       description:
         input.description !== undefined ? normalizeOptionalString(input.description) : undefined,
-      material: input.material !== undefined ? normalizeOptionalString(input.material) : undefined,
-      finish: input.finish !== undefined ? normalizeOptionalString(input.finish) : undefined,
       diamondCount: input.diamondCount,
       pieceRateRs:
         input.pieceRateRs !== undefined ? new Prisma.Decimal(input.pieceRateRs) : undefined,
-      salePricePerDozen:
-        input.salePricePerDozen !== undefined
-          ? new Prisma.Decimal(input.salePricePerDozen)
-          : undefined,
+      salePriceRs:
+        input.salePriceRs !== undefined ? new Prisma.Decimal(input.salePriceRs) : undefined,
       imageUrl: input.imageUrl !== undefined ? normalizeOptionalString(input.imageUrl) : undefined,
       status: input.status,
       notes: input.notes !== undefined ? normalizeOptionalString(input.notes) : undefined,

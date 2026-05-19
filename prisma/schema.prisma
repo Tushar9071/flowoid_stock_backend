@@ -78,6 +78,11 @@ enum RawMaterialPurchaseStatus {
   CANCELLED // purchase cancelled
 }
 
+enum RawMaterialMovementType {
+  ISSUE
+  RETURN
+}
+
 enum TenantStatus {
   TRIAL
   ACTIVE
@@ -256,9 +261,8 @@ model RawMaterialType {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  purchases   RawMaterialPurchase[]
-  issuances   RawMaterialIssuance[]
-  assignments WorkerAssignment[]
+  purchases RawMaterialPurchase[]
+  issuances RawMaterialIssuance[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
@@ -303,18 +307,20 @@ model RawMaterialIssuance {
 
   // Real FK now — replaces the old referenceId/referenceType soft ref
   assignment   WorkerAssignment @relation(fields: [assignmentId], references: [id])
-  assignmentId String           @unique // one issuance per assignment
+  assignmentId String
 
-  quantity    Decimal  @db.Decimal(18, 4)
-  issuedAt    DateTime @default(now())
-  notes       String?
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  movementType RawMaterialMovementType @default(ISSUE)
+  quantity     Decimal                 @db.Decimal(18, 4)
+  issuedAt     DateTime                @default(now())
+  notes        String?
+  createdBy    User                    @relation(fields: [createdById], references: [id])
+  createdById  String
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
 
   @@index([tenantId, materialTypeId])
   @@index([tenantId, issuedAt])
+  @@index([tenantId, assignmentId, movementType])
   @@map("raw_material_issuances")
 }
 
@@ -517,10 +523,6 @@ model Design {
   name        String
   description String?
 
-  // Material & finish
-  material String? // "Gold Plated", "Silver Plated", "Rhodium"
-  finish   String? // "Matte", "Glossy", "Antique"
-
   // The key business field — drives worker piece rate
   diamondCount Int @default(0)
 
@@ -529,8 +531,8 @@ model Design {
   // so future changes don't affect historical calculations
   pieceRateRs Decimal @db.Decimal(10, 2)
 
-  // Wholesale pricing
-  salePricePerDozen Decimal @db.Decimal(10, 2)
+  // Sale pricing per finished unit
+  salePriceRs Decimal @db.Decimal(10, 2)
 
   // Reference image — owner can upload photo of design
   imageUrl String?
@@ -622,10 +624,19 @@ model SupplementaryIssuance {
   @@map("supplementary_issuances")
 }
 
+// I love my self because i am imperfect. 
+// I am  imperfect, and that’s why i am growing; 
+// if i was perfect i would have been dead.
+
+
+
+
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // WORKER ASSIGNMENTS
 // Core of the manufacturing flow.
-// One assignment = one worker + one design + one raw material lot.
+// One assignment = one worker + one design + one or more raw material lots.
 // ─────────────────────────────────────────────────────────────────────────────
 
 model WorkerAssignment {
@@ -636,11 +647,6 @@ model WorkerAssignment {
   workerId String
   design   Design @relation(fields: [designId], references: [id])
   designId String
-
-  // Raw material issued for this assignment
-  rawMaterialType   RawMaterialType @relation(fields: [rawMaterialTypeId], references: [id])
-  rawMaterialTypeId String
-  rawMaterialQty    Decimal         @db.Decimal(18, 4)
 
   // Piece tracking
   expectedPieces Int // owner's expectation based on raw material qty
@@ -669,7 +675,7 @@ model WorkerAssignment {
   // Relations
   goodsReturns           GoodsReturn[]
   supplementaryIssuances SupplementaryIssuance[]
-  rawMaterialIssuance    RawMaterialIssuance? // one issuance created automatically
+  rawMaterialIssuances   RawMaterialIssuance[] // raw materials issued automatically
 
   @@index([tenantId, workerId])
   @@index([tenantId, designId])
@@ -744,8 +750,7 @@ model InventoryStock {
   design           Design   @relation(fields: [designId], references: [id])
   designId         String   @unique
   unpackagedPieces Int      @default(0)
-  packagedDozens   Int      @default(0)
-  lowStockAlertAt  Int      @default(0)
+  packagedPieces   Int      @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -753,7 +758,7 @@ model InventoryStock {
   inventoryAdjustments InventoryAdjustment[]
   orderDispatchItems   OrderDispatchItem[]
 
-  @@index([tenantId, packagedDozens])
+  @@index([tenantId, packagedPieces])
   @@map("inventory_stocks")
 }
 
@@ -763,8 +768,7 @@ model PackagingBatch {
   tenantId         String
   inventoryStock   InventoryStock @relation(fields: [inventoryStockId], references: [id])
   inventoryStockId String
-  dozensPackaged   Int
-  piecesUsed       Int
+  piecesPackaged   Int
   packedBy         User           @relation(fields: [packedById], references: [id])
   packedById       String
   packedAt         DateTime       @default(now())
@@ -844,9 +848,9 @@ model OrderItem {
   orderId          String
   design           Design   @relation(fields: [designId], references: [id])
   designId         String
-  quantityDozens   Int
-  dispatchedDozens Int      @default(0)
-  pricePerDozen    Decimal  @db.Decimal(18, 2)
+  quantityPieces   Int
+  dispatchedPieces Int      @default(0)
+  pricePerPiece    Decimal  @db.Decimal(18, 2)
   lineTotal        Decimal  @db.Decimal(18, 2)
   notes            String?
   createdAt        DateTime @default(now())
@@ -891,7 +895,7 @@ model OrderDispatchItem {
   orderItemId      String
   inventoryStock   InventoryStock @relation(fields: [inventoryStockId], references: [id])
   inventoryStockId String
-  dozensDispatched Int
+  piecesDispatched Int
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 

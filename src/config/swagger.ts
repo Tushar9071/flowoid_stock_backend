@@ -212,7 +212,7 @@ const options: swaggerJsdoc.Options = {
       { name: "Workers", description: "Tenant-scoped worker profiles, summaries, assignments, payments, and ledger views" },
       { name: "Assignments", description: "Worker assignments with automatic raw material and supplementary issuances" },
       { name: "Goods Returns", description: "Batch returns of finished goods against worker assignments" },
-      { name: "Inventory", description: "Finished goods stock, packaging batches, adjustments, and low stock alerts" },
+      { name: "Inventory", description: "Finished goods stock, packaging batches, and adjustments" },
       { name: "Orders", description: "Dealer orders, dispatches, packaged stock deduction, and sale ledger entries" },
       { name: "Payments", description: "Dealer receipts, supplier payments, outstanding balances, aging, and cash flow" },
       { name: "Documents", description: "PDF invoices, delivery challans, and payment receipts" },
@@ -392,7 +392,7 @@ const options: swaggerJsdoc.Options = {
           requestBody: {
             required: true,
             content: {
-              "application/json": {
+              "multipart/form-data": {
                 schema: { $ref: "#/components/schemas/CreateTenantRequest" },
               },
             },
@@ -1410,7 +1410,7 @@ const options: swaggerJsdoc.Options = {
           requestBody: {
             required: true,
             content: {
-              "application/json": {
+              "multipart/form-data": {
                 schema: { $ref: "#/components/schemas/CreateDesignRequest" },
               },
             },
@@ -1447,12 +1447,12 @@ const options: swaggerJsdoc.Options = {
           tags: ["Designs"],
           summary: "Update a design",
           description:
-            "Updates design details, pricing, lifecycle status, category, or media URL for a non-deleted design.",
+            "Updates design details, pricing, lifecycle status, category, or local design image for a non-deleted design.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
-              "application/json": {
+              "multipart/form-data": {
                 schema: { $ref: "#/components/schemas/UpdateDesignRequest" },
               },
             },
@@ -2496,33 +2496,9 @@ const options: swaggerJsdoc.Options = {
               schema: { type: "string", format: "uuid" },
               description: "Filter stock overview by design category ID",
             },
-            {
-              name: "isLow",
-              in: "query",
-              schema: { type: "boolean" },
-              description:
-                "Filter low-stock rows. A row is low when lowStockAlertAt is greater than 0 and packagedDozens is below that threshold.",
-            },
           ],
           responses: {
             200: { $ref: "#/components/responses/InventoryStockListSuccess" },
-            400: { $ref: "#/components/responses/ValidationError" },
-            401: { $ref: "#/components/responses/UnauthorizedError" },
-            403: { $ref: "#/components/responses/ForbiddenError" },
-            404: { $ref: "#/components/responses/NotFoundError" },
-          },
-        },
-      },
-      "/api/tenants/{tenantId}/inventory/stock/alerts": {
-        parameters: [{ $ref: "#/components/parameters/TenantIdPathParam" }],
-        get: {
-          tags: ["Inventory"],
-          summary: "List low stock alerts",
-          description:
-            "Returns designs where packaged dozens are below the configured lowStockAlertAt threshold. Results are sorted by highest deficit first.",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            200: { $ref: "#/components/responses/InventoryLowStockAlertListSuccess" },
             400: { $ref: "#/components/responses/ValidationError" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
             403: { $ref: "#/components/responses/ForbiddenError" },
@@ -2556,40 +2532,6 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
-      "/api/tenants/{tenantId}/inventory/stock/{designId}/alert": {
-        parameters: [
-          { $ref: "#/components/parameters/TenantIdPathParam" },
-          {
-            name: "designId",
-            in: "path",
-            required: true,
-            schema: { type: "string", format: "uuid" },
-            description: "Design ID",
-          },
-        ],
-        patch: {
-          tags: ["Inventory"],
-          summary: "Update low stock alert threshold",
-          description:
-            "Sets the packaged-dozen threshold used to mark this design as low stock. Use 0 to disable alerts for the design.",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/UpdateInventoryLowStockAlertRequest" },
-              },
-            },
-          },
-          responses: {
-            200: { $ref: "#/components/responses/InventoryStockSuccess" },
-            400: { $ref: "#/components/responses/ValidationError" },
-            401: { $ref: "#/components/responses/UnauthorizedError" },
-            403: { $ref: "#/components/responses/ForbiddenError" },
-            404: { $ref: "#/components/responses/NotFoundError" },
-          },
-        },
-      },
       "/api/tenants/{tenantId}/inventory/stock/{designId}/adjustment": {
         parameters: [
           { $ref: "#/components/parameters/TenantIdPathParam" },
@@ -2605,7 +2547,7 @@ const options: swaggerJsdoc.Options = {
           tags: ["Inventory"],
           summary: "Create inventory stock adjustment",
           description:
-            "Creates a manual stock adjustment for unpackaged pieces or packaged dozens, then returns the adjustment and refreshed stock. Negative adjustments are blocked if they would make stock negative.",
+            "Creates a manual stock adjustment for unpackaged pieces or packaged pieces, then returns the adjustment and refreshed stock. Negative adjustments are blocked if they would make stock negative.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -2638,7 +2580,7 @@ const options: swaggerJsdoc.Options = {
                         success: false,
                         error: {
                           code: "VALIDATION_ERROR",
-                          message: "Adjustment would make packaged stock negative. Available: 2 dozens",
+                          message: "Adjustment would make packaged stock negative. Available: 24 pieces",
                           details: null,
                         },
                       },
@@ -2659,7 +2601,7 @@ const options: swaggerJsdoc.Options = {
           tags: ["Inventory"],
           summary: "Create packaging batch",
           description:
-            "Converts unpackaged pieces into packaged dozens for a design. Each dozen consumes 12 unpackaged pieces.",
+            "Converts unpackaged pieces into packaged pieces for a design. Specify how many pieces to mark as packaged.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
@@ -3081,6 +3023,34 @@ const options: swaggerJsdoc.Options = {
           summary: "Get outstanding balance for a party from ledger entries",
           responses: {
             200: { $ref: "#/components/responses/OutstandingBalanceSuccess" },
+            400: { $ref: "#/components/responses/ValidationError" },
+            401: { $ref: "#/components/responses/UnauthorizedError" },
+            403: { $ref: "#/components/responses/ForbiddenError" },
+            404: { $ref: "#/components/responses/NotFoundError" },
+          },
+        },
+      },
+      "/api/tenants/{tenantId}/payments/party/{partyId}/order-outstanding": {
+        parameters: [
+          { $ref: "#/components/parameters/TenantIdPathParam" },
+          { $ref: "#/components/parameters/PartyIdPathParam" },
+        ],
+        get: {
+          tags: ["Payments"],
+          summary: "Get dealer order-wise outstanding payments",
+          description:
+            "Returns opening balance, dispatched order dues, payment allocation details, and unallocated dealer credits for one dealer.",
+          parameters: [
+            {
+              name: "includePaid",
+              in: "query",
+              required: false,
+              schema: { type: "boolean", default: false },
+              description: "Include fully paid dispatched orders in the response",
+            },
+          ],
+          responses: {
+            200: { $ref: "#/components/responses/OrderOutstandingSuccess" },
             400: { $ref: "#/components/responses/ValidationError" },
             401: { $ref: "#/components/responses/UnauthorizedError" },
             403: { $ref: "#/components/responses/ForbiddenError" },
@@ -4475,14 +4445,6 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
-        InventoryLowStockAlertListSuccess: {
-          description: "Low stock inventory alert list",
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/InventoryLowStockAlertListResponse" },
-            },
-          },
-        },
         PackagingBatchSuccess: {
           description: "Packaging batch response",
           content: {
@@ -4568,6 +4530,14 @@ const options: swaggerJsdoc.Options = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/OutstandingBalanceResponse" },
+            },
+          },
+        },
+        OrderOutstandingSuccess: {
+          description: "Dealer order-wise outstanding response",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/OrderOutstandingResponse" },
             },
           },
         },
@@ -5009,10 +4979,10 @@ const options: swaggerJsdoc.Options = {
               type: "string",
               example: "Ahmedabad, Gujarat",
             },
-            logoUrl: {
+            logo: {
               type: "string",
-              format: "uri",
-              example: "https://example.com/logo.png",
+              format: "binary",
+              description: "Optional tenant logo image. Supported formats: JPEG, PNG, WebP, GIF. Max size: 2MB.",
             },
             businessCategory: {
               type: "string",
@@ -5296,7 +5266,7 @@ const options: swaggerJsdoc.Options = {
             },
             logoUrl: {
               type: "string",
-              format: "uri",
+              example: "storage/tenant-logos/1715850000000-logo.png",
               nullable: true,
             },
             businessCategory: {
@@ -5533,16 +5503,13 @@ const options: swaggerJsdoc.Options = {
               nullable: true,
               example: "Stone necklace with floral pattern",
             },
-            material: { type: "string", example: "Gold Plated" },
-            finish: { type: "string", example: "Glossy" },
             diamondCount: { type: "integer", example: 12 },
             pieceRateRs: { type: "string", example: "18.00" },
-            salePricePerDozen: { type: "string", example: "960.00" },
+            salePriceRs: { type: "string", example: "80.00" },
             imageUrl: {
               type: "string",
-              format: "uri",
               nullable: true,
-              example: "https://example.com/designs/ay-nk-001.png",
+              example: "storage/design-images/1715850000000-design.png",
             },
             status: { $ref: "#/components/schemas/DesignStatus" },
             deletedAt: { type: "string", format: "date-time", nullable: true },
@@ -5614,22 +5581,20 @@ const options: swaggerJsdoc.Options = {
             "name",
             "diamondCount",
             "pieceRateRs",
-            "salePricePerDozen",
+            "salePriceRs",
           ],
           properties: {
             categoryId: { type: "string", format: "uuid" },
             designCode: { type: "string", example: "AY-NK-001" },
             name: { type: "string", minLength: 2, example: "Classic Stone Necklace" },
             description: { type: "string", example: "Necklace with premium stone layout" },
-            material: { type: "string", example: "Gold Plated" },
-            finish: { type: "string", example: "Glossy" },
             diamondCount: { type: "integer", minimum: 0, example: 12 },
             pieceRateRs: { type: "number", minimum: 0.01, example: 18 },
-            salePricePerDozen: { type: "number", minimum: 0.01, example: 960 },
-            imageUrl: {
+            salePriceRs: { type: "number", minimum: 0.01, example: 80 },
+            image: {
               type: "string",
-              format: "uri",
-              example: "https://example.com/designs/ay-nk-001.png",
+              format: "binary",
+              description: "Optional design image. Supported formats: JPEG, PNG, WebP, GIF. Max size: 2MB.",
             },
             status: { $ref: "#/components/schemas/DesignStatus" },
             notes: { type: "string", example: "High demand design" },
@@ -5643,15 +5608,13 @@ const options: swaggerJsdoc.Options = {
             designCode: { type: "string", example: "AY-NK-001" },
             name: { type: "string", minLength: 2, example: "Classic Stone Necklace" },
             description: { type: "string", example: "Updated description" },
-            material: { type: "string", example: "Rhodium" },
-            finish: { type: "string", example: "Matte" },
             diamondCount: { type: "integer", minimum: 0, example: 16 },
             pieceRateRs: { type: "number", minimum: 0.01, example: 22 },
-            salePricePerDozen: { type: "number", minimum: 0.01, example: 1100 },
-            imageUrl: {
+            salePriceRs: { type: "number", minimum: 0.01, example: 90 },
+            image: {
               type: "string",
-              format: "uri",
-              example: "https://example.com/designs/ay-nk-001-v2.png",
+              format: "binary",
+              description: "Optional replacement design image. Supported formats: JPEG, PNG, WebP, GIF. Max size: 2MB.",
             },
             status: { $ref: "#/components/schemas/DesignStatus" },
             notes: { type: "string", example: "Updated factory specification" },
@@ -5761,8 +5724,6 @@ const options: swaggerJsdoc.Options = {
             tenantId: { type: "string", format: "uuid" },
             workerId: { type: "string", format: "uuid" },
             designId: { type: "string", format: "uuid" },
-            rawMaterialTypeId: { type: "string", format: "uuid" },
-            rawMaterialQty: { type: "string", example: "10.5000" },
             expectedPieces: { type: "integer", example: 120 },
             returnedPieces: { type: "integer", example: 48 },
             rejectedPieces: { type: "integer", example: 2 },
@@ -5792,10 +5753,9 @@ const options: swaggerJsdoc.Options = {
                 name: { type: "string", example: "Classic Stone Necklace" },
               },
             },
-            rawMaterialType: { $ref: "#/components/schemas/RawMaterialType" },
-            rawMaterialIssuance: {
-              allOf: [{ $ref: "#/components/schemas/RawMaterialIssuance" }],
-              nullable: true,
+            rawMaterialIssuances: {
+              type: "array",
+              items: { $ref: "#/components/schemas/RawMaterialIssuance" },
             },
             supplementaryIssuances: {
               type: "array",
@@ -6104,15 +6064,24 @@ const options: swaggerJsdoc.Options = {
           required: [
             "workerId",
             "designId",
-            "rawMaterialTypeId",
-            "rawMaterialQty",
+            "rawMaterials",
             "expectedPieces",
           ],
           properties: {
             workerId: { type: "string", format: "uuid" },
             designId: { type: "string", format: "uuid" },
-            rawMaterialTypeId: { type: "string", format: "uuid" },
-            rawMaterialQty: { type: "number", minimum: 0.0001, example: 10.5 },
+            rawMaterials: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                required: ["rawMaterialTypeId", "rawMaterialQty"],
+                properties: {
+                  rawMaterialTypeId: { type: "string", format: "uuid" },
+                  rawMaterialQty: { type: "number", minimum: 0.0001, example: 10.5 },
+                },
+              },
+            },
             expectedPieces: { type: "integer", minimum: 1, example: 120 },
             expectedReturnDate: { type: "string", format: "date-time" },
             notes: { type: "string", example: "Urgent bridal batch" },
@@ -6692,6 +6661,7 @@ const options: swaggerJsdoc.Options = {
             tenantId: { type: "string", format: "uuid" },
             materialTypeId: { type: "string", format: "uuid" },
             assignmentId: { type: "string", format: "uuid" },
+            movementType: { type: "string", enum: ["ISSUE", "RETURN"], example: "ISSUE" },
             quantity: { type: "string", example: "12.5" },
             issuedAt: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true },
@@ -6709,8 +6679,8 @@ const options: swaggerJsdoc.Options = {
             unit: { $ref: "#/components/schemas/RawMaterialUnit" },
             totalPurchased: { type: "string", example: "120.0" },
             totalIssued: { type: "string", example: "25.0" },
+            totalReturned: { type: "string", example: "5.0" },
             currentStock: { type: "string", example: "95.0" },
-            isLow: { type: "boolean", example: false },
           },
         },
         RawMaterialPagination: {
@@ -7016,6 +6986,77 @@ const options: swaggerJsdoc.Options = {
           },
           required: ["success", "data"],
         },
+        OrderOutstandingPayment: {
+          type: "object",
+          properties: {
+            allocationId: { type: "string", format: "uuid" },
+            paymentId: { type: "string", format: "uuid" },
+            allocatedAmount: { type: "string", example: "2500.00" },
+            paymentAmount: { type: "string", example: "5000.00" },
+            paymentDate: { type: "string", format: "date-time" },
+            paymentMethod: { $ref: "#/components/schemas/PaymentMethod" },
+            paymentStatus: { $ref: "#/components/schemas/PaymentStatus" },
+            referenceNumber: { type: "string", nullable: true },
+            bankName: { type: "string", nullable: true },
+            notes: { type: "string", nullable: true },
+          },
+        },
+        OrderOutstandingOrder: {
+          type: "object",
+          properties: {
+            orderId: { type: "string", format: "uuid" },
+            orderNumber: { type: "string", example: "ORD-0001" },
+            orderStatus: { $ref: "#/components/schemas/OrderStatus" },
+            orderDate: { type: "string", format: "date-time" },
+            dueDate: { type: "string", format: "date-time", nullable: true },
+            dispatchedAt: { type: "string", format: "date-time", nullable: true },
+            totalAmount: { type: "string", example: "15000.00" },
+            paidAmount: { type: "string", example: "5000.00" },
+            pendingAmount: { type: "string", example: "10000.00" },
+            paymentStatus: {
+              type: "string",
+              enum: ["UNPAID", "PARTIALLY_PAID", "PAID"],
+              example: "PARTIALLY_PAID",
+            },
+            payments: {
+              type: "array",
+              items: { $ref: "#/components/schemas/OrderOutstandingPayment" },
+            },
+          },
+        },
+        OrderOutstandingResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                party: { $ref: "#/components/schemas/Party" },
+                openingBalance: { type: "object" },
+                summary: {
+                  type: "object",
+                  properties: {
+                    ledgerOutstanding: { type: "string", example: "30000.00" },
+                    totalOrderPending: { type: "string", example: "20000.00" },
+                    totalUnallocatedCredits: { type: "string", example: "0.00" },
+                    totalInvoiced: { type: "string", example: "20000.00" },
+                    totalReceived: { type: "string", example: "0.00" },
+                    displayedOrders: { type: "integer", example: 2 },
+                  },
+                },
+                orders: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/OrderOutstandingOrder" },
+                },
+                unallocatedCredits: {
+                  type: "array",
+                  items: { type: "object" },
+                },
+              },
+            },
+          },
+          required: ["success", "data"],
+        },
         AgingReport: {
           type: "object",
           properties: {
@@ -7113,6 +7154,7 @@ const options: swaggerJsdoc.Options = {
         },
         UpdatePaymentStatusRequest: {
           type: "object",
+          description: "Cash payments cannot be marked as BOUNCED. Use CANCELLED for a wrongly recorded cash payment.",
           additionalProperties: false,
           required: ["paymentStatus"],
           properties: {
@@ -7126,7 +7168,10 @@ const options: swaggerJsdoc.Options = {
             id: { type: "string", format: "uuid" },
             workerId: { type: "string", format: "uuid" },
             designId: { type: "string", format: "uuid" },
-            rawMaterialQty: { type: "number", example: 10 },
+            rawMaterialIssuances: {
+              type: "array",
+              items: { $ref: "#/components/schemas/RawMaterialIssuance" },
+            },
             expectedPieces: { type: "integer", example: 120 },
             returnedPieces: { type: "integer", example: 48 },
             rejectedPieces: { type: "integer", example: 2 },
@@ -7142,9 +7187,7 @@ const options: swaggerJsdoc.Options = {
             tenantId: { type: "string", format: "uuid" },
             designId: { type: "string", format: "uuid" },
             unpackagedPieces: { type: "integer", example: 84 },
-            packagedDozens: { type: "integer", example: 15 },
-            lowStockAlertAt: { type: "integer", example: 5 },
-            isLow: { type: "boolean", example: false },
+            packagedPieces: { type: "integer", example: 180 },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
             design: { $ref: "#/components/schemas/InventoryDesign" },
@@ -7159,7 +7202,7 @@ const options: swaggerJsdoc.Options = {
             designCode: { type: "string", example: "AY-NK-001" },
             name: { type: "string", example: "Classic Necklace" },
             status: { type: "string", enum: ["ACTIVE", "DISCONTINUED", "DRAFT"] },
-            salePricePerDozen: { type: "string", example: "1200.00" },
+            salePriceRs: { type: "string", example: "100.00" },
             category: {
               type: "object",
               properties: {
@@ -7190,8 +7233,7 @@ const options: swaggerJsdoc.Options = {
             id: { type: "string", format: "uuid" },
             tenantId: { type: "string", format: "uuid" },
             inventoryStockId: { type: "string", format: "uuid" },
-            dozensPackaged: { type: "integer", example: 3 },
-            piecesUsed: { type: "integer", example: 36 },
+            piecesPackaged: { type: "integer", example: 36 },
             packedById: { type: "string", format: "uuid" },
             packedAt: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true, example: "Packed for showroom stock" },
@@ -7236,17 +7278,6 @@ const options: swaggerJsdoc.Options = {
             updatedAt: { type: "string", format: "date-time" },
           },
         },
-        InventoryLowStockAlert: {
-          allOf: [
-            { $ref: "#/components/schemas/InventoryStock" },
-            {
-              type: "object",
-              properties: {
-                deficitDozens: { type: "integer", example: 3 },
-              },
-            },
-          ],
-        },
         InventoryStockResponse: {
           type: "object",
           properties: {
@@ -7290,17 +7321,6 @@ const options: swaggerJsdoc.Options = {
                 pagination: { $ref: "#/components/schemas/InventoryPagination" },
               },
               required: ["items", "pagination"],
-            },
-          },
-          required: ["success", "data"],
-        },
-        InventoryLowStockAlertListResponse: {
-          type: "object",
-          properties: {
-            success: { type: "boolean", example: true },
-            data: {
-              type: "array",
-              items: { $ref: "#/components/schemas/InventoryLowStockAlert" },
             },
           },
           required: ["success", "data"],
@@ -7364,19 +7384,11 @@ const options: swaggerJsdoc.Options = {
         CreatePackagingBatchRequest: {
           type: "object",
           additionalProperties: false,
-          required: ["designId", "dozensPackaged"],
+          required: ["designId", "piecesPackaged"],
           properties: {
             designId: { type: "string", format: "uuid" },
-            dozensPackaged: { type: "integer", minimum: 1, example: 3 },
+            piecesPackaged: { type: "integer", minimum: 1, example: 36 },
             notes: { type: "string", example: "Packed for showroom stock" },
-          },
-        },
-        UpdateInventoryLowStockAlertRequest: {
-          type: "object",
-          additionalProperties: false,
-          required: ["lowStockAlertAt"],
-          properties: {
-            lowStockAlertAt: { type: "integer", minimum: 0, example: 5 },
           },
         },
         CreateInventoryAdjustmentRequest: {
@@ -7441,10 +7453,10 @@ const options: swaggerJsdoc.Options = {
             tenantId: { type: "string", format: "uuid" },
             orderId: { type: "string", format: "uuid" },
             designId: { type: "string", format: "uuid" },
-            quantityDozens: { type: "integer", example: 10 },
-            dispatchedDozens: { type: "integer", example: 4 },
-            remainingDozens: { type: "integer", example: 6 },
-            pricePerDozen: { type: "string", example: "1200.00" },
+            quantityPieces: { type: "integer", example: 120 },
+            dispatchedPieces: { type: "integer", example: 48 },
+            remainingPieces: { type: "integer", example: 72 },
+            pricePerPiece: { type: "string", example: "100.00" },
             lineTotal: { type: "string", example: "12000.00" },
             notes: { type: "string", nullable: true },
             createdAt: { type: "string", format: "date-time" },
@@ -7460,7 +7472,7 @@ const options: swaggerJsdoc.Options = {
             dispatchId: { type: "string", format: "uuid" },
             orderItemId: { type: "string", format: "uuid" },
             inventoryStockId: { type: "string", format: "uuid" },
-            dozensDispatched: { type: "integer", example: 4 },
+            piecesDispatched: { type: "integer", example: 4 },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
             orderItem: { $ref: "#/components/schemas/OrderItem" },
@@ -7507,9 +7519,9 @@ const options: swaggerJsdoc.Options = {
             createdById: { type: "string", format: "uuid" },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
-            totalDozens: { type: "integer", example: 10 },
-            dispatchedDozens: { type: "integer", example: 4 },
-            remainingDozens: { type: "integer", example: 6 },
+            totalPieces: { type: "integer", example: 10 },
+            dispatchedPieces: { type: "integer", example: 4 },
+            remainingPieces: { type: "integer", example: 6 },
             isOverdue: { type: "boolean", example: false },
             outstandingAmount: { type: "string", example: "11500.00" },
             dealer: { $ref: "#/components/schemas/OrderDealer" },
@@ -7620,11 +7632,11 @@ const options: swaggerJsdoc.Options = {
                       trackingRef: { type: "string", nullable: true, example: "D123456789" },
                       designCode: { type: "string", example: "AY-NK-001" },
                       designName: { type: "string", example: "Classic Necklace" },
-                      dispatchedDozens: { type: "integer", example: 4 },
+                      dispatchedPieces: { type: "integer", example: 4 },
                     },
                   },
                 },
-                totalDozensDispatched: { type: "integer", example: 4 },
+                totalPiecesDispatched: { type: "integer", example: 4 },
                 totalAmount: { type: "string", example: "11500.00" },
                 dispatches: {
                   type: "array",
@@ -7638,11 +7650,11 @@ const options: swaggerJsdoc.Options = {
         CreateOrderItemRequest: {
           type: "object",
           additionalProperties: false,
-          required: ["designId", "quantityDozens"],
+          required: ["designId", "quantityPieces"],
           properties: {
             designId: { type: "string", format: "uuid" },
-            quantityDozens: { type: "integer", minimum: 1, example: 10 },
-            pricePerDozen: { type: "number", exclusiveMinimum: 0, example: 1200 },
+            quantityPieces: { type: "integer", minimum: 1, example: 10 },
+            pricePerPiece: { type: "number", exclusiveMinimum: 0, example: 1200 },
             notes: { type: "string", example: "Priority design" },
           },
         },
@@ -7678,8 +7690,8 @@ const options: swaggerJsdoc.Options = {
           type: "object",
           additionalProperties: false,
           properties: {
-            quantityDozens: { type: "integer", minimum: 1, example: 12 },
-            pricePerDozen: { type: "number", exclusiveMinimum: 0, example: 1250 },
+            quantityPieces: { type: "integer", minimum: 1, example: 12 },
+            pricePerPiece: { type: "number", exclusiveMinimum: 0, example: 1250 },
             notes: { type: "string", example: "Negotiated price" },
           },
         },
@@ -7693,14 +7705,14 @@ const options: swaggerJsdoc.Options = {
             dispatchedAt: { type: "string", format: "date-time" },
             items: {
               type: "array",
-              description: "Optional partial dispatch list. If omitted, all remaining dozens are dispatched.",
+              description: "Optional partial dispatch list. If omitted, all remaining pieces are dispatched.",
               items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["itemId", "dozens"],
+                required: ["itemId", "pieces"],
                 properties: {
                   itemId: { type: "string", format: "uuid" },
-                  dozens: { type: "integer", minimum: 1, example: 4 },
+                  pieces: { type: "integer", minimum: 1, example: 4 },
                 },
               },
             },

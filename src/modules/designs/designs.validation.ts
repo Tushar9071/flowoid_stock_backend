@@ -113,18 +113,13 @@ export const createDesignSchema = z.object({
   designCode: z.string().trim().min(1, "Design code is required").max(120),
   name: z.string().trim().min(2, "Design name must be at least 2 characters").max(160),
   description: optionalTrimmedString,
-  material: optionalTrimmedString,
-  finish: optionalTrimmedString,
   diamondCount: z.coerce
     .number()
     .int("Diamond count must be a whole number")
     .min(0, "Diamond count cannot be negative"),
   pieceRateRs: positiveDecimalNumber,
-  salePricePerDozen: positiveDecimalNumber,
-  imageUrl: optionalTrimmedString.refine(
-    (value) => !value || z.string().url().safeParse(value).success,
-    "Image URL must be a valid URL",
-  ),
+  salePriceRs: positiveDecimalNumber,
+  imageUrl: optionalTrimmedString,
   status: z.enum(designStatuses).default("ACTIVE"),
   notes: optionalTrimmedString,
 });
@@ -140,19 +135,14 @@ export const updateDesignSchema = z
       .max(160)
       .optional(),
     description: optionalTrimmedString,
-    material: optionalTrimmedString,
-    finish: optionalTrimmedString,
     diamondCount: z.coerce
       .number()
       .int("Diamond count must be a whole number")
       .min(0, "Diamond count cannot be negative")
       .optional(),
     pieceRateRs: optionalPositiveDecimalNumber,
-    salePricePerDozen: optionalPositiveDecimalNumber,
-    imageUrl: optionalTrimmedString.refine(
-      (value) => !value || z.string().url().safeParse(value).success,
-      "Image URL must be a valid URL",
-    ),
+    salePriceRs: optionalPositiveDecimalNumber,
+    imageUrl: optionalTrimmedString,
     status: z.enum(designStatuses).optional(),
     notes: optionalTrimmedString,
   })

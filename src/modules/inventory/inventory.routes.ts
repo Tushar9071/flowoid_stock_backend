@@ -12,19 +12,9 @@ router.get("/stock",
   // requirePermission("inventory.read"), 
   ctrl.getStockOverview);
 
-router.get("/stock/alerts", 
-  // requirePermission("inventory.read"), 
-  ctrl.getLowStockAlerts);
-
 router.get("/stock/:designId", // 
   // requirePermission("inventory.read"), 
   ctrl.getStockByDesign);
-
-router.patch(
-  "/stock/:designId/alert",
-  // requirePermission("inventory.update"),
-  ctrl.updateLowStockAlert,
-);
 
 router.post(
   "/stock/:designId/adjustment",

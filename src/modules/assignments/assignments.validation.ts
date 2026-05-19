@@ -64,8 +64,30 @@ export const goodsReturnParamsSchema = tenantParamsSchema.extend({
 export const createAssignmentSchema = z.object({
   workerId: z.string().uuid("Worker ID must be a valid UUID"),
   designId: z.string().uuid("Design ID must be a valid UUID"),
-  rawMaterialTypeId: z.string().uuid("Raw material type ID must be a valid UUID"),
-  rawMaterialQty: positiveDecimalNumber,
+  rawMaterials: z
+    .array(
+      z.object({
+        rawMaterialTypeId: z.string().uuid("Raw material type ID must be a valid UUID"),
+        rawMaterialQty: positiveDecimalNumber,
+      }),
+    )
+    .min(1, "At least one raw material is required")
+    .superRefine((items, ctx) => {
+      const seenMaterialTypeIds = new Set<string>();
+
+      items.forEach((item, index) => {
+        if (seenMaterialTypeIds.has(item.rawMaterialTypeId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index, "rawMaterialTypeId"],
+            message: "Raw material type cannot be repeated in the same assignment",
+          });
+          return;
+        }
+
+        seenMaterialTypeIds.add(item.rawMaterialTypeId);
+      });
+    }),
   expectedPieces: z.coerce
     .number()
     .int("Expected pieces must be a whole number")

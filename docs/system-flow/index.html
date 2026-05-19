@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flowoid Stock Backend - Business Flow Handbook</title>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      themeVariables: {
+        primaryColor: "#f8fafc",
+        primaryTextColor: "#172033",
+        primaryBorderColor: "#2c5f8f",
+        lineColor: "#526271",
+        secondaryColor: "#fff7ed",
+        tertiaryColor: "#eefdf7",
+        fontFamily: "Inter, Segoe UI, Arial, sans-serif"
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #647184;
+      --line: #d9e0e8;
+      --panel: #ffffff;
+      --bg: #f6f8fb;
+      --blue: #24577a;
+      --green: #28715a;
+      --amber: #9a5d14;
+      --red: #a33a35;
+      --violet: #6a4b91;
+      --shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      line-height: 1.52;
+    }
+    header {
+      min-height: 88vh;
+      display: grid;
+      align-items: end;
+      background:
+        linear-gradient(180deg, rgba(11, 31, 47, 0.40), rgba(11, 31, 47, 0.80)),
+        url("https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1800&q=80") center/cover;
+      color: #fff;
+      padding: 44px clamp(18px, 5vw, 72px);
+    }
+    header .hero {
+      max-width: 1120px;
+    }
+    h1 {
+      font-size: clamp(40px, 7vw, 86px);
+      line-height: 0.98;
+      margin: 0 0 18px;
+      letter-spacing: 0;
+    }
+    header p {
+      max-width: 900px;
+      font-size: clamp(17px, 2vw, 23px);
+      color: rgba(255,255,255,0.9);
+      margin: 0 0 26px;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      max-width: 980px;
+      margin-top: 26px;
+    }
+    .hero-chip {
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.11);
+      padding: 12px 14px;
+      border-radius: 8px;
+      backdrop-filter: blur(4px);
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px clamp(14px, 4vw, 54px);
+      background: rgba(255,255,255,0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+    nav a {
+      color: var(--blue);
+      text-decoration: none;
+      border: 1px solid var(--line);
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      background: #fff;
+    }
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 36px clamp(16px, 4vw, 44px) 70px;
+    }
+    section {
+      margin: 34px 0 52px;
+    }
+    h2 {
+      font-size: clamp(27px, 3.4vw, 44px);
+      margin: 0 0 12px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    h4 {
+      margin: 16px 0 8px;
+      font-size: 16px;
+    }
+    .lead {
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 980px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .compact {
+      padding: 14px;
+      box-shadow: none;
+    }
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      background: #e8f1f8;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      margin: 0 6px 6px 0;
+    }
+    .tag.green { background: #e9f8f1; color: var(--green); }
+    .tag.amber { background: #fff3df; color: var(--amber); }
+    .tag.red { background: #fdebea; color: var(--red); }
+    .tag.violet { background: #f0ebf7; color: var(--violet); }
+    .mermaid-wrap {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      box-shadow: var(--shadow);
+      margin: 16px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      display: table;
+      box-shadow: var(--shadow);
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th {
+      background: #eef3f7;
+      color: #25364a;
+      font-size: 13px;
+    }
+    tr:last-child td { border-bottom: 0; }
+    code {
+      background: #eef3f7;
+      padding: 2px 5px;
+      border-radius: 5px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92em;
+    }
+    .two {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+    }
+    .callout {
+      border-left: 5px solid var(--blue);
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .callout.warn { border-left-color: var(--amber); }
+    .callout.risk { border-left-color: var(--red); }
+    .scenario {
+      border-top: 4px solid var(--green);
+    }
+    .scenario ol {
+      padding-left: 22px;
+    }
+    .scenario li {
+      margin: 8px 0;
+    }
+    .small { color: var(--muted); font-size: 13px; }
+    .source-list li { margin: 6px 0; }
+    @media (max-width: 840px) {
+      .two { grid-template-columns: 1fr; }
+      nav { position: static; }
+      table { display: block; overflow-x: auto; }
+      header { min-height: 78vh; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero">
+      <h1>Flowoid Stock Backend Handbook</h1>
+      <p>Business-flow, system-flow, API, and onboarding documentation for the imitation jewelry backend. Built from the actual Express, Prisma, and service-layer flows in the uploaded codebase.</p>
+      <div class="hero-grid">
+        <div class="hero-chip"><strong>Core chain</strong><br />Purchase material -> make goods -> package -> sell -> collect money</div>
+        <div class="hero-chip"><strong>Stock truth</strong><br />Inventory is recalculated from returns, packaging, adjustments, and dispatches</div>
+        <div class="hero-chip"><strong>Money truth</strong><br />Party ledger changes on opening balance, sale dispatch, and payment</div>
+        <div class="hero-chip"><strong>Document truth</strong><br />Invoice/challan require dispatch; WhatsApp sends generated PDFs</div>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <a href="#executive">Executive Map</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#modules">Modules</a>
+    <a href="#inventory-life">Inventory Lifecycle</a>
+    <a href="#money-life">Money Lifecycle</a>
+    <a href="#scenarios">Business Scenarios</a>
+    <a href="#frontend">Frontend Guide</a>
+    <a href="#owner">Owner Guide</a>
+    <a href="#risks">Risks</a>
+    <a href="#evidence">Code Evidence</a>
+  </nav>
+
+  <main>
+    <section id="executive">
+      <h2>Executive Map</h2>
+      <p class="lead">This system is a tenant-based business management backend. It does not treat stock as a single manually edited number. Finished inventory is the result of manufacturing activity, packaging, adjustments, and dispatch. Dealer outstanding is the result of opening balances, sale ledger entries created during dispatch, and payment ledger entries.</p>
+
+      <div class="grid">
+        <div class="card">
+          <span class="tag green">Business Rule</span>
+          <h3>Sales depend on packaged stock</h3>
+          <p>An order can be drafted for active dealer and active designs, but it cannot be confirmed unless packaged dozens are available after considering other confirmed/packed/partially dispatched orders.</p>
+        </div>
+        <div class="card">
+          <span class="tag amber">Manufacturing Rule</span>
+          <h3>Prepared stock starts with worker returns</h3>
+          <p>Raw material is issued only through worker assignments. Accepted returned pieces become unpackaged prepared stock; rejected pieces increase rejection tracking but do not become saleable stock.</p>
+        </div>
+        <div class="card">
+          <span class="tag violet">Finance Rule</span>
+          <h3>Ledger is event-driven</h3>
+          <p>Opening balance creates a ledger entry. Dispatch creates SALE ledger entries. Dealer receipts, advances, supplier payments, cancellations, and bounced payments create payment or reversal ledger entries.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Document Rule</span>
+          <h3>PDF and WhatsApp follow operations</h3>
+          <p>Invoices and challans are generated only for dispatched or partially dispatched orders. WhatsApp reuses or generates documents, uploads the PDF to Meta, sends a template, and records message status logs.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>High-Level Architecture</h2>
+      <p class="lead">The backend is an Express API with tenant-scoped routes. Controllers validate request data and call service functions. Prisma models represent business entities and service functions enforce the operational rules.</p>
+
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart LR
+  FE["Frontend UI"] --> API["Express app.ts /api routes"]
+  API --> Auth["Auth + permissions + tenant access"]
+  Auth --> Controllers["Module controllers"]
+  Controllers --> Services["Service layer business rules"]
+  Services --> Prisma["Prisma Client"]
+  Prisma --> DB[("PostgreSQL")]
+  Services --> PDF["PDF service + HTML templates"]
+  Services --> Meta["Meta WhatsApp Cloud API"]
+  Services --> Logs["System logs + WhatsApp logs"]
+        </pre>
+      </div>
+
+      <div class="two">
+        <div class="callout">
+          <h3>Main Data Boundaries</h3>
+          <p><strong>Tenant</strong> isolates business data. Most business routes are mounted under <code>/api/tenants/:tenantId</code>. Users access tenants through <code>TenantUser</code>, except <code>SUPER_ADMIN</code>.</p>
+          <p><strong>Party</strong> is shared by supplier and dealer workflows. The <code>type</code> field decides whether the same entity can be used in purchases, orders, or payments.</p>
+          <p><strong>Design</strong> is the SKU-like master for manufacturing, inventory, and sales.</p>
+        </div>
+        <div class="callout warn">
+          <h3>Most Important Mental Model</h3>
+          <p>There are two stock layers for a design: <strong>unpackaged pieces</strong> and <strong>packaged dozens</strong>. Workers return pieces. Packaging consumes 12 pieces per dozen. Sales dispatch consumes packaged dozens.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="modules">
+      <h2>Module Relationships</h2>
+      <p class="lead">These are the practical dependencies a frontend or operator must respect. The arrows show the direction in which data is needed or mutated.</p>
+
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart TD
+  Tenant["Tenant"] --> Parties["Party / Dealer / Supplier"]
+  Tenant --> Users["Users / Roles / Permissions"]
+  Parties --> RawPurchase["Raw Material Purchase"]
+  RawType["Raw Material Type"] --> RawPurchase
+  RawPurchase --> RawStock["Raw Material Stock = received purchases - assignment issuances"]
+  Worker["Worker"] --> Assignment["Worker Assignment"]
+  Design["Design + Category"] --> Assignment
+  RawStock --> Assignment
+  Supplementary["Supplementary Materials"] --> Assignment
+  Assignment --> RawIssuance["Raw Material Issuance"]
+  Assignment --> SuppIssuance["Supplementary Issuance"]
+  Assignment --> GoodsReturn["Goods Return"]
+  GoodsReturn --> Unpackaged["Unpackaged Prepared Pieces"]
+  Unpackaged --> Packaging["Packaging Batch"]
+  Packaging --> Packaged["Packaged Dozens"]
+  Parties --> Order["Dealer Order"]
+  Design --> Order
+  Packaged --> Confirm["Order Confirm"]
+  Confirm --> Pack["Order Pack"]
+  Pack --> Dispatch["Order Dispatch"]
+  Dispatch --> LedgerSale["Party Ledger: SALE debit"]
+  Dispatch --> Documents["Invoice / Challan"]
+  Dispatch --> Packaged
+  Parties --> Payment["Dealer / Supplier Payment"]
+  Order --> Payment
+  Payment --> LedgerPayment["Party Ledger: payment entry"]
+  Payment --> CashFlow["Cash Flow / Aging / Outstanding"]
+  Documents --> WhatsApp["WhatsApp Send + Logs"]
+        </pre>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Module</th><th>Owns</th><th>Depends On</th><th>Mutates / Produces</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Parties</td><td>Dealers, suppliers, opening balance, statements</td><td>Tenant membership</td><td>Opening ledger entries, duplicate checks, party status</td></tr>
+          <tr><td>Raw Material</td><td>Raw material types, purchases, raw stock view</td><td>Supplier party</td><td>Purchase rows; stock is computed from purchases minus assignment issuances</td></tr>
+          <tr><td>Designs</td><td>Categories, designs, rates, sale price, supplementary needs</td><td>Supplementary material types</td><td>Reference data used by assignment, inventory, and order flows</td></tr>
+          <tr><td>Supplementary</td><td>Stones, hooks, chains, packaging extras, current quantities</td><td>Tenant</td><td>Manual stock adjustment and automatic decrement during assignment</td></tr>
+          <tr><td>Workers</td><td>Worker profile, worker payments, worker ledger view</td><td>Assignments and returns</td><td>Worker dues and payment history</td></tr>
+          <tr><td>Assignments</td><td>Manufacturing job card: worker + design + raw material + expected pieces</td><td>Active worker, active design, raw stock, supplementary stock</td><td>Raw material issuance, supplementary issuance, goods returns, worker earning totals</td></tr>
+          <tr><td>Inventory</td><td>Prepared stock overview, packaging, adjustments, low stock alerts</td><td>Goods returns, packaging batches, dispatch items</td><td>Inventory stock snapshots recalculated by sync logic</td></tr>
+          <tr><td>Orders</td><td>Draft/confirmed/packed/dispatch order lifecycle</td><td>Active dealer, active designs, packaged stock</td><td>Order items, dispatches, dispatched quantities, SALE ledger entries</td></tr>
+          <tr><td>Payments</td><td>Dealer receipts, supplier payments, allocation, cash flow, aging</td><td>Party and optionally dispatched/confirmed orders</td><td>Payment rows, allocation rows, payment ledger entries, reversal entries</td></tr>
+          <tr><td>Documents</td><td>Invoice, challan, payment receipt PDFs</td><td>Dispatched order or payment</td><td>GeneratedDocument metadata and stored PDF files</td></tr>
+          <tr><td>WhatsApp</td><td>Config, templates, invoice/receipt/challan sending, logs</td><td>Generated documents, party phone, Meta config</td><td>Media uploads, template sends, message logs, webhook status updates</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="inventory-life">
+      <h2>Lifecycle Of Stock And Items</h2>
+      <p class="lead">The code has three different inventory concepts. Raw material stock is material-level. Prepared stock is design-level. Saleable stock is packaged dozens only.</p>
+
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+stateDiagram-v2
+  [*] --> RawMaterialType: create material type
+  RawMaterialType --> RawPurchasePending: create purchase PENDING
+  RawPurchasePending --> RawPurchaseReceived: status RECEIVED
+  RawMaterialType --> RawPurchaseReceived: create purchase RECEIVED
+  RawPurchaseReceived --> RawAvailable: contributes to raw stock
+  RawAvailable --> AssignmentIssued: create worker assignment
+  AssignmentIssued --> InProgress: mark status IN_PROGRESS
+  AssignmentIssued --> PartialReturn: record accepted goods return
+  InProgress --> PartialReturn: record accepted goods return
+  PartialReturn --> Completed: returnedPieces >= expectedPieces
+  PartialReturn --> PartialReturn: additional partial return
+  Completed --> UnpackagedPreparedPieces: accepted pieces are stock input
+  UnpackagedPreparedPieces --> PackagedDozens: packaging batch, 12 pieces per dozen
+  PackagedDozens --> Reserved: order confirm validates/reserves logically
+  Reserved --> Packed: mark order packed
+  Packed --> Dispatched: dispatch consumes packaged dozens
+  Dispatched --> [*]
+        </pre>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Raw Material Formula</h3>
+          <p><code>current raw stock = RECEIVED raw purchases - raw material issuances</code></p>
+          <p>Manual raw material issuance is explicitly disabled. The backend tells users to create issuances through assignment flow.</p>
+        </div>
+        <div class="card">
+          <h3>Unpackaged Prepared Formula</h3>
+          <p><code>unpackaged pieces = accepted goods returns + unpackaged adjustments - pieces used in packaging</code></p>
+          <p>Rejected worker pieces do not enter stock. They stay on assignment/return records for quality and worker accounting.</p>
+        </div>
+        <div class="card">
+          <h3>Packaged Stock Formula</h3>
+          <p><code>packaged dozens = packaging batches + packaged adjustments - dispatched dozens</code></p>
+          <p>Order confirmation and dispatch both use synced packaged stock to prevent negative inventory.</p>
+        </div>
+      </div>
+
+      <h3>Prepared Stock Creation Sequence</h3>
+      <table>
+        <thead><tr><th>Step</th><th>Backend action</th><th>Business meaning</th><th>Stock effect</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Create supplier party and raw material type</td><td>Define where material comes from and what it is</td><td>No stock movement</td></tr>
+          <tr><td>2</td><td>Create raw material purchase with status <code>RECEIVED</code></td><td>Material is physically available</td><td>Raw stock increases by quantity</td></tr>
+          <tr><td>3</td><td>Create active design with piece rate and sale price</td><td>Define what will be manufactured and sold</td><td>No stock movement</td></tr>
+          <tr><td>4</td><td>Create worker assignment</td><td>Give worker raw material for a design</td><td>Raw stock decreases through automatic <code>RawMaterialIssuance</code>; supplementary stock decreases if design needs exist</td></tr>
+          <tr><td>5</td><td>Record goods return</td><td>Worker returns finished/rejected pieces</td><td>Accepted pieces become unpackaged prepared stock when inventory sync runs</td></tr>
+          <tr><td>6</td><td>Create packaging batch</td><td>Convert loose pieces into saleable dozens</td><td>Unpackaged pieces decrease by <code>dozens * 12</code>; packaged dozens increase</td></tr>
+          <tr><td>7</td><td>Confirm order</td><td>Reserve stock logically for dealer order</td><td>No dispatch yet, but available stock subtracts other confirmed/packed/partial reservations</td></tr>
+          <tr><td>8</td><td>Dispatch order</td><td>Goods leave business</td><td>Packaged dozens decrease; dealer ledger gets SALE debit</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="money-life">
+      <h2>Flow Of Money, Ledger, And Cash</h2>
+      <p class="lead">There is no separate general ledger engine; the party ledger is the financial backbone. The same ledger table tracks opening balances, sale debits, payment credits/debits, and reversals.</p>
+
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+  participant Owner as Owner/Cashier
+  participant Orders as Orders Service
+  participant Ledger as PartyLedgerEntry
+  participant Payments as Payments Service
+  participant Reports as Outstanding/Cashflow/Aging
+
+  Owner->>Orders: Dispatch dealer order
+  Orders->>Ledger: Create SALE debit for dispatched amount
+  Orders->>Ledger: Recalculate running balances
+  Owner->>Payments: Record dealer payment
+  Payments->>Payments: Validate dealer and allocations
+  Payments->>Ledger: Create PAYMENT_RECEIVED credit
+  Payments->>Ledger: Recalculate running balances
+  Reports->>Ledger: Outstanding = debits - credits
+  Reports->>Payments: Cashflow = cleared receipts - cleared supplier payments
+  Reports->>Payments: Aging = unpaid dispatched orders by due date
+        </pre>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <span class="tag green">Dealer sale</span>
+          <p>Dispatch writes a <code>SALE</code> ledger row. For partial dispatch, the sale amount is proportional to dispatched subtotal. Final dispatch writes any remaining amount so the ledger total equals order total after discount.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Dealer payment</span>
+          <p>A dealer payment with allocations becomes <code>DEALER_RECEIPT</code>. Without allocations it becomes <code>DEALER_ADVANCE</code>. Both create <code>PAYMENT_RECEIVED</code> credit entries.</p>
+        </div>
+        <div class="card">
+          <span class="tag amber">Supplier payment</span>
+          <p>Supplier payments create <code>SUPPLIER_PAYMENT</code> records and ledger entries as money paid out. Raw material purchases themselves do not currently create purchase ledger entries.</p>
+        </div>
+        <div class="card">
+          <span class="tag red">Payment reversal</span>
+          <p>When a payment is marked <code>BOUNCED</code> or <code>CANCELLED</code>, the service creates a reversal ledger row instead of deleting historical ledger impact.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="scenarios">
+      <h2>Business Scenario Flows</h2>
+      <p class="lead">These are practical operating stories, written in the order a real jewelry business should use the system.</p>
+
+      <div class="card scenario">
+        <h3>Scenario 1: Raw Material Purchase -> Stock Preparation -> Sale -> Payment</h3>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart LR
+  A["Create supplier"] --> B["Create raw material type"]
+  B --> C["Record RECEIVED raw purchase"]
+  C --> D["Create design + supplementary needs"]
+  D --> E["Create worker assignment"]
+  E --> F["Raw material issuance created automatically"]
+  E --> G["Supplementary stock decremented"]
+  F --> H["Record goods return"]
+  H --> I["Accepted pieces become unpackaged stock"]
+  I --> J["Package pieces into dozens"]
+  J --> K["Create dealer order"]
+  K --> L["Confirm against packaged stock"]
+  L --> M["Pack order"]
+  M --> N["Dispatch"]
+  N --> O["SALE ledger debit"]
+  O --> P["Generate invoice/challan"]
+  P --> Q["Record payment"]
+  Q --> R["PAYMENT_RECEIVED ledger credit"]
+          </pre>
+        </div>
+        <ol>
+          <li>Set up the supplier under Parties with type <code>SUPPLIER</code>.</li>
+          <li>Create the raw material type, then create a raw material purchase. Only purchases with status <code>RECEIVED</code> count as stock.</li>
+          <li>Create design category and design. The design stores worker piece rate and sale price per dozen.</li>
+          <li>Optionally define supplementary needs on the design. These act as a template: assignment quantity is <code>quantityPerPiece * expectedPieces</code>.</li>
+          <li>Create a worker assignment. The backend checks active worker, active design, active raw material, raw stock availability, and supplementary availability. It automatically creates raw material issuance and supplementary issuances.</li>
+          <li>Record goods returns when the worker brings items back. Accepted pieces increase assignment <code>returnedPieces</code>, worker <code>totalEarned</code>, and prepared stock calculation.</li>
+          <li>Package finished pieces. The backend requires enough unpackaged pieces and consumes exactly 12 pieces for each dozen.</li>
+          <li>Create dealer order. The order starts as <code>DRAFT</code>, so it can be edited.</li>
+          <li>Confirm order. The backend validates packaged stock after subtracting other active reservations.</li>
+          <li>Pack and dispatch. Dispatch creates dispatch items, increments each order item dispatched quantity, syncs inventory, updates order status, and creates SALE ledger entries.</li>
+          <li>Generate invoice/challan, optionally send through WhatsApp, then record dealer payment. Payment creates payment allocation and payment ledger entries.</li>
+        </ol>
+      </div>
+
+      <div class="card scenario">
+        <h3>Scenario 2: Dealer Wants Item X But Prepared Stock Does Not Exist</h3>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TD
+  A["Dealer asks for Item X"] --> B{"Design X exists and active?"}
+  B -- No --> B1["Create/activate design with sale price and piece rate"]
+  B -- Yes --> C{"Packaged dozens available?"}
+  B1 --> C
+  C -- Yes --> O["Create order -> confirm -> pack -> dispatch"]
+  C -- No --> D{"Unpackaged pieces available?"}
+  D -- Yes --> P["Create packaging batch"]
+  P --> O
+  D -- No --> E{"Raw material available?"}
+  E -- No --> R["Purchase/receive raw material first"]
+  R --> F
+  E -- Yes --> F["Assign worker to make Item X"]
+  F --> G["Worker returns goods"]
+  G --> H["Accepted pieces sync into unpackaged stock"]
+  H --> P
+          </pre>
+        </div>
+        <p><strong>Why the sale cannot proceed:</strong> confirmation requires packaged dozens. The system intentionally blocks confirmation when packaged stock is insufficient, because dispatch would otherwise create negative stock and incorrect dealer ledger.</p>
+        <p><strong>Correct operating path:</strong> check inventory stock for the design. If unpackaged stock exists, package it. If not, create a worker assignment. If raw stock is short, receive raw material first. Only after packaging should the order be confirmed.</p>
+        <p><strong>What changes internally:</strong> assignment consumes raw/supplementary material, goods return creates accepted pieces, packaging creates saleable dozens, confirmation reserves stock logically, dispatch reduces packaged stock and creates the SALE ledger entry.</p>
+      </div>
+
+      <div class="card scenario">
+        <h3>Scenario 3: Worker Assignment And Stock Preparation</h3>
+        <table>
+          <thead><tr><th>Operation</th><th>Backend validation</th><th>Backend mutation</th><th>Business result</th></tr></thead>
+          <tbody>
+            <tr><td>Create assignment</td><td>Worker active, design active, raw material active, raw stock enough, supplementary stock enough</td><td>Create <code>WorkerAssignment</code>, <code>RawMaterialIssuance</code>, <code>SupplementaryIssuance</code>; decrement supplementary stock</td><td>Worker receives job card and materials</td></tr>
+            <tr><td>Mark in progress</td><td>Only from <code>ISSUED</code></td><td>Status becomes <code>IN_PROGRESS</code></td><td>Work has started</td></tr>
+            <tr><td>Record return</td><td>Assignment not completed/closed</td><td>Create <code>GoodsReturn</code>; update returned, rejected, total earned, assignment status</td><td>Accepted pieces become prepared stock input; worker earning is tracked</td></tr>
+            <tr><td>Close assignment</td><td>Not already completed/closed</td><td>Status becomes <code>CLOSED</code></td><td>Manager ends job due to dispute, inactive worker, or business reason</td></tr>
+            <tr><td>Worker payment</td><td>Worker exists and payment type is valid</td><td>Create <code>WorkerPayment</code></td><td>Worker dues/advance ledger view changes</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card scenario">
+        <h3>Scenario 4: Partial Payments And Cash Flow</h3>
+        <ol>
+          <li>Dealer order is dispatched. This creates dealer receivable in the party ledger.</li>
+          <li>Dealer pays part of the amount. Frontend records <code>POST /payments/dealer</code> with one or more allocations.</li>
+          <li>The payment amount may be split across multiple orders. The backend rejects allocations to draft or cancelled orders and rejects orders belonging to another dealer.</li>
+          <li>The payment creates a <code>PAYMENT_RECEIVED</code> ledger credit. Outstanding becomes ledger debits minus credits.</li>
+          <li>Cashflow reads cleared payments for a day and separates dealer receipts from supplier payments.</li>
+          <li>If cheque/transfer fails later, mark payment <code>BOUNCED</code>. The backend creates reversal ledger entry and cash/outstanding reports stop treating it as valid.</li>
+        </ol>
+      </div>
+
+      <div class="card scenario">
+        <h3>Scenario 5: WhatsApp Invoice Generation Flow</h3>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+sequenceDiagram
+  participant User
+  participant WhatsApp as WhatsApp Service
+  participant Docs as Documents Service
+  participant DB as Prisma DB
+  participant Meta as Meta Cloud API
+
+  User->>WhatsApp: POST /whatsapp/send/invoice/:orderId
+  WhatsApp->>DB: Read enabled tenant config
+  WhatsApp->>DB: Read order + dealer phone
+  WhatsApp->>DB: Find GeneratedDocument
+  alt Missing PDF
+    WhatsApp->>Docs: generateInvoice(orderId)
+    Docs->>DB: Validate order is dispatched or partially dispatched
+    Docs->>DB: Save GeneratedDocument metadata
+  end
+  WhatsApp->>Meta: Resolve approved template language
+  WhatsApp->>Meta: Upload PDF media
+  WhatsApp->>DB: Create message log QUEUED
+  WhatsApp->>Meta: Send template with document header
+  Meta-->>WhatsApp: provider message id
+  WhatsApp->>DB: Update log SENT
+  Meta-->>DB: Webhook updates DELIVERED/READ/FAILED
+          </pre>
+        </div>
+        <p>The invoice cannot be sent unless an enabled WhatsApp config exists, the dealer has a valid phone number, and the order can generate a document. Since invoice generation requires a dispatched or partially dispatched order, WhatsApp invoice sending also inherits that rule.</p>
+      </div>
+    </section>
+
+    <section id="frontend">
+      <h2>Frontend Developer Guide</h2>
+      <p class="lead">Build the frontend around workflows, not isolated CRUD pages. Many APIs are technically independent routes but operationally depend on earlier module data.</p>
+
+      <h3>Recommended Navigation Model</h3>
+      <div class="grid">
+        <div class="card compact"><strong>Setup</strong><br />Tenants, users, roles, permissions, parties, workers, design catalog, raw/supplementary material masters</div>
+        <div class="card compact"><strong>Manufacturing</strong><br />Raw material stock, assignments, goods returns, worker payments, prepared stock</div>
+        <div class="card compact"><strong>Inventory</strong><br />Stock overview, low stock alerts, packaging batches, adjustments</div>
+        <div class="card compact"><strong>Sales</strong><br />Dealer orders, confirm/pack/dispatch, invoices, challans, WhatsApp</div>
+        <div class="card compact"><strong>Finance</strong><br />Party ledger, payments, outstanding, aging, cash flow</div>
+        <div class="card compact"><strong>Admin</strong><br />Monitoring, backups, system logs</div>
+      </div>
+
+      <h3>API Grouping By Module</h3>
+      <table>
+        <thead><tr><th>Module</th><th>Base path</th><th>Important endpoints</th><th>Frontend notes</th></tr></thead>
+        <tbody>
+          <tr><td>Auth</td><td><code>/api/auth</code></td><td><code>/register</code>, <code>/login</code>, <code>/refresh</code>, <code>/me</code>, <code>/my-permissions</code></td><td>Fetch tenant list after login; enforce permissions in UI but still expect backend enforcement.</td></tr>
+          <tr><td>Parties</td><td><code>/api/tenants/:tenantId/parties</code></td><td><code>GET /dropdown</code>, <code>GET /check-duplicate</code>, <code>/:partyId/ledger</code>, opening balance endpoints</td><td>Use type filters: <code>DEALER</code> for orders/payments received, <code>SUPPLIER</code> for purchases/supplier payments.</td></tr>
+          <tr><td>Raw Materials</td><td><code>/api/tenants/:tenantId/raw-materials</code></td><td><code>/types</code>, <code>/purchases</code>, <code>/stock</code>, <code>/issuances</code></td><td>Hide or disable manual issuance creation in UI; backend rejects it. Issuances are created by assignment.</td></tr>
+          <tr><td>Designs</td><td><code>/api/tenants/:tenantId/designs</code></td><td><code>/categories</code>, <code>/</code>, <code>/:id/status</code>, <code>/:id/supplementary-needs</code></td><td>Show status clearly. Only <code>ACTIVE</code> designs can be assigned or ordered.</td></tr>
+          <tr><td>Supplementary</td><td><code>/api/tenants/:tenantId/supplementary</code></td><td><code>GET /</code>, <code>POST /</code>, <code>PATCH /:id/stock</code></td><td>Stock is decremented during assignment based on design needs. Manual adjustment endpoint should require strong UI confirmation.</td></tr>
+          <tr><td>Workers</td><td><code>/api/tenants/:tenantId/workers</code></td><td><code>/</code>, <code>/:id/assignments</code>, <code>/payments</code>, <code>/:id/ledger</code></td><td>Worker payment is separate from goods return; do not assume return means payment was made.</td></tr>
+          <tr><td>Assignments</td><td><code>/api/tenants/:tenantId/assignments</code></td><td><code>POST /</code>, <code>PATCH /:id/status</code>, <code>POST /:id/returns</code>, <code>/goods-returns</code></td><td>Create assignment screen needs worker, design, raw material, expected pieces, raw material qty, expected return date.</td></tr>
+          <tr><td>Inventory</td><td><code>/api/tenants/:tenantId/inventory</code></td><td><code>/stock</code>, <code>/stock/:designId</code>, <code>/packaging</code>, <code>/stock/:designId/adjustment</code></td><td>Stock endpoints trigger sync. Refresh stock after goods return, packaging, dispatch, or adjustment.</td></tr>
+          <tr><td>Orders</td><td><code>/api/tenants/:tenantId/orders</code></td><td><code>POST /</code>, <code>/:orderId/confirm</code>, <code>/pack</code>, <code>/dispatch</code>, item endpoints, overdue, dispatch-summary</td><td>Use a status-driven UI. Draft can edit items; confirmed can pack; packed/partial can dispatch; dispatched cannot cancel.</td></tr>
+          <tr><td>Payments</td><td><code>/api/tenants/:tenantId/payments</code></td><td><code>/dealer</code>, <code>/supplier</code>, <code>/:paymentId/status</code>, <code>/cashflow</code>, <code>/aging-report</code>, <code>/party/:partyId/outstanding</code></td><td>Allocation UI should list only valid dealer orders and prevent allocated amount exceeding payment amount.</td></tr>
+          <tr><td>Documents</td><td><code>/api/tenants/:tenantId/documents</code></td><td><code>/orders/:orderId/invoice</code>, <code>/orders/:orderId/challan</code>, <code>/payments/:paymentId/receipt</code></td><td>Invoice/challan buttons should appear only after partial/full dispatch. Receipt is blocked only for cancelled payments.</td></tr>
+          <tr><td>WhatsApp</td><td><code>/api/tenants/:tenantId/whatsapp</code></td><td><code>/config</code>, <code>/config/test</code>, <code>/send/invoice/:orderId</code>, <code>/send/receipt/:paymentId</code>, <code>/send/challan/:dispatchId</code>, <code>/logs</code></td><td>Show pre-flight checks: enabled config, party phone, template names, document readiness.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Critical Frontend Validations</h3>
+      <div class="grid">
+        <div class="card compact"><strong>Order confirm</strong><br />Pre-check <code>GET /inventory/stock/:designId</code>. Still call confirm and display backend shortage details, because reservations by other orders can change.</div>
+        <div class="card compact"><strong>Assignment creation</strong><br />Show raw stock and supplementary requirements before submit. Warn when expected pieces multiplied by supplementary needs exceeds stock.</div>
+        <div class="card compact"><strong>Payment allocation</strong><br />Prevent allocation total above payment amount. Do not allocate to draft/cancelled orders or another dealer's order.</div>
+        <div class="card compact"><strong>Packaging</strong><br />Show unpackaged pieces and calculate required pieces as <code>dozens * 12</code>.</div>
+        <div class="card compact"><strong>Documents</strong><br />Disable invoice/challan before partial/full dispatch. Label challan as latest dispatch-based but includes all dispatch items in generated document.</div>
+        <div class="card compact"><strong>WhatsApp</strong><br />Normalize Indian phone numbers visually; backend accepts 10-digit or 12-digit numeric forms and converts to E.164-like <code>91...</code>.</div>
+      </div>
+
+      <h3>Common Mistakes To Avoid</h3>
+      <ul>
+        <li>Do not show raw material issuance as a normal manual operation. The backend returns a validation error and tells users to use assignment flow.</li>
+        <li>Do not treat <code>InventoryStock</code> as the only source of truth. The service recalculates it from activity tables.</li>
+        <li>Do not create payments as a substitute for dispatch. Dealer outstanding from sales appears only after SALE ledger entries are written during dispatch.</li>
+        <li>Do not assume an order is financially due when it is only <code>DRAFT</code> or <code>CONFIRMED</code>. Aging reports use partially/full dispatched orders.</li>
+        <li>Do not allow design edits that silently affect existing worker assignments. The assignment locks <code>pieceRateAtAssignment</code>, so historical earning stays stable.</li>
+        <li>Do not hide rejection fields in goods return. Rejected pieces affect worker quality tracking and explain why expected pieces may not become saleable stock.</li>
+      </ul>
+    </section>
+
+    <section id="owner">
+      <h2>Business Owner Guide</h2>
+      <p class="lead">Use the system in the same order the business actually works. Think of it as four counters: material counter, worker counter, stock counter, and sales/cash counter.</p>
+
+      <div class="grid">
+        <div class="card">
+          <h3>1. Set Up Masters</h3>
+          <p>Add dealers, suppliers, workers, raw materials, supplementary materials, and designs. A design is the item you sell. It carries the worker rate and sale price.</p>
+        </div>
+        <div class="card">
+          <h3>2. Buy Material</h3>
+          <p>Record raw material purchases when material arrives. If material is only ordered but not received, keep it pending so it does not appear as usable stock.</p>
+        </div>
+        <div class="card">
+          <h3>3. Give Work To Worker</h3>
+          <p>Create an assignment when you give material to a worker. The system reduces raw material stock and supplementary stock immediately, because those goods are now with the worker.</p>
+        </div>
+        <div class="card">
+          <h3>4. Receive Finished Goods</h3>
+          <p>When the worker returns goods, enter how many pieces came back and how many were rejected. Only accepted pieces become stock.</p>
+        </div>
+        <div class="card">
+          <h3>5. Pack Before Selling</h3>
+          <p>The system sells in dozens. Loose accepted pieces must be packed into dozens before orders can be confirmed.</p>
+        </div>
+        <div class="card">
+          <h3>6. Sell And Collect</h3>
+          <p>Create dealer order, confirm stock, pack, dispatch, generate bill, send by WhatsApp, then record payment. Outstanding reports update from these entries.</p>
+        </div>
+      </div>
+
+      <h3>Correct Operational Sequence</h3>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart LR
+  A["Add masters"] --> B["Receive raw material"]
+  B --> C["Assign worker"]
+  C --> D["Receive worker returns"]
+  D --> E["Package dozens"]
+  E --> F["Confirm dealer order"]
+  F --> G["Pack order"]
+  G --> H["Dispatch"]
+  H --> I["Invoice / challan / WhatsApp"]
+  I --> J["Collect payment"]
+  J --> K["Review outstanding and cash flow"]
+        </pre>
+      </div>
+
+      <div class="callout warn">
+        <h3>Common Operational Mistakes</h3>
+        <p><strong>Selling before packaging:</strong> The system blocks this because loose pieces are not saleable dozens yet.</p>
+        <p><strong>Skipping worker return:</strong> If worker returns are not entered, prepared stock will not increase.</p>
+        <p><strong>Entering payment before dispatch:</strong> This can be recorded as advance, but it will not create a sale. The sale happens only when goods are dispatched.</p>
+        <p><strong>Using wrong party type:</strong> Suppliers are for material purchases and supplier payments. Dealers are for sales orders and dealer receipts.</p>
+      </div>
+    </section>
+
+    <section id="risks">
+      <h2>Hidden Coupling, Risks, And Simplifications</h2>
+      <p class="lead">These are not necessarily bugs; they are areas where modules are tightly connected or the UI must be careful.</p>
+
+      <table>
+        <thead><tr><th>Area</th><th>Observation</th><th>Risk</th><th>Possible simplification</th></tr></thead>
+        <tbody>
+          <tr><td>Inventory sync duplicated</td><td>Both inventory service and orders service contain stock calculation/sync logic.</td><td>Future bug if formulas diverge.</td><td>Extract a shared inventory domain service used by inventory and orders.</td></tr>
+          <tr><td>Party ledger recalculation duplicated</td><td>Parties, orders, and payments all recalculate running balances.</td><td>Any change to ledger rules must be repeated.</td><td>Create a ledger service with typed voucher helpers.</td></tr>
+          <tr><td>Raw purchase finance gap</td><td>Supplier payment affects ledger, but raw material purchase does not create a purchase/payable ledger entry.</td><td>Supplier outstanding may not reflect unpaid purchases unless handled outside this flow.</td><td>Add PURCHASE ledger entry on received purchase, or explicitly document supplier payments as cash-only tracking.</td></tr>
+          <tr><td>Logical reservation</td><td>Order confirmation does not create a reservation table; availability subtracts remaining quantities from confirmed/packed/partial orders.</td><td>Correct but harder to explain and potentially expensive at scale.</td><td>Add explicit stock reservation rows if order volume grows.</td></tr>
+          <tr><td>Manual adjustments</td><td>Inventory and supplementary materials allow direct stock adjustments.</td><td>Can hide operational mistakes if overused.</td><td>Require reason categories and manager approval for adjustments.</td></tr>
+          <tr><td>Documents tied to order status</td><td>Invoice/challan generation requires dispatched or partially dispatched order.</td><td>Users cannot preview invoice before dispatch.</td><td>Add pro-forma invoice endpoint if business needs pre-dispatch preview.</td></tr>
+          <tr><td>WhatsApp provider coupling</td><td>Service directly resolves templates and uploads to Meta.</td><td>Harder to add another provider later.</td><td>Wrap provider operations behind a WhatsApp provider interface.</td></tr>
+          <tr><td>Route permission comments</td><td>Some module route permissions are commented out while <code>requireAuth</code> remains.</td><td>Authenticated users may access operations unless controller/service checks cover it.</td><td>Re-enable permission middleware consistently per module.</td></tr>
+          <tr><td>Naming inconsistency</td><td><code>Parties</code> folder is PascalCase while other modules are lower/camel case; supplementary route names differ from model names.</td><td>Slower onboarding and import mistakes.</td><td>Standardize module folder and route naming.</td></tr>
+          <tr><td>Payment status update</td><td>Reversal entries are created when marking payment bounced/cancelled, but allocations remain.</td><td>Reports must always filter cancelled/bounced payments. Some screens may accidentally show allocation as paid.</td><td>Add computed paid status helpers or allocation effective-status views.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="evidence">
+      <h2>Code Evidence Map</h2>
+      <p class="lead">Key implementation points traced from the uploaded backend.</p>
+
+      <ul class="source-list">
+        <li><code>src/app.ts</code> mounts tenant module routes including parties, raw materials, designs, supplementary, workers, assignments, inventory, orders, payments, documents, and WhatsApp.</li>
+        <li><code>prisma/schema.prisma</code> defines core models: <code>Party</code> line 204, <code>RawMaterialPurchase</code> line 268, <code>WorkerAssignment</code> line 631, <code>GoodsReturn</code> line 683, <code>InventoryStock</code> line 740, <code>Order</code> line 800, <code>Payment</code> line 908, <code>GeneratedDocument</code> line 985, <code>WhatsappMessageLog</code> line 1039.</li>
+        <li><code>src/modules/assignments/assignments.service.ts</code>: raw stock check at <code>getRawMaterialStock</code> line 152; assignment creation at line 310; goods return at line 540.</li>
+        <li><code>src/modules/inventory/inventory.service.ts</code>: stock formula at <code>calculateStockTotals</code> line 192; stock snapshot sync at line 267; packaging batch at line 480; stock adjustment at line 616.</li>
+        <li><code>src/modules/orders/orders.service.ts</code>: stock formula duplicated at line 435; order creation at line 805; confirmation stock validation at line 946; dispatch and sale ledger creation at line 1004; dispatch ledger helper at line 651.</li>
+        <li><code>src/modules/payments/payments.service.ts</code>: payment ledger entry helper at line 201; dealer payment at line 282; supplier payment at line 381; reversal on bounced/cancelled at line 429; cash flow at line 696.</li>
+        <li><code>src/modules/documents/documents.service.ts</code>: invoice at line 367; challan at line 426; payment receipt at line 486. Order documents require dispatched or partially dispatched order.</li>
+        <li><code>src/modules/whatsapp/whatsapp.service.ts</code>: invoice send at line 396; receipt send at line 446; challan send at line 496; logs at line 546.</li>
+      </ul>
+
+      <div class="callout">
+        <h3>How To Keep This Handbook Current</h3>
+        <p>When business rules change, update this document alongside the service file that owns the rule. In particular, changes to inventory formulas, order statuses, ledger entry rules, and WhatsApp document preconditions should be reflected here immediately.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

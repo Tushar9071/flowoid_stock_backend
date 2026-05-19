@@ -25,23 +25,6 @@ const optionalDate = z.preprocess((value) => {
   return value;
 }, z.date().optional());
 
-const optionalBoolean = z.preprocess((value) => {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true") return true;
-    if (normalized === "false") return false;
-  }
-
-  return value;
-}, z.boolean().optional());
 
 export const tenantParamsSchema = z.object({
   tenantId: z.string().uuid("Tenant ID must be a valid UUID"),
@@ -60,16 +43,15 @@ export const listStockQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   designId: z.string().uuid("Design ID must be a valid UUID").optional(),
   categoryId: z.string().uuid("Category ID must be a valid UUID").optional(),
-  isLow: optionalBoolean,
 });
 
 export const createPackagingBatchSchema = z
   .object({
     designId: z.string().uuid("Design ID must be a valid UUID"),
-    dozensPackaged: z.coerce
+    piecesPackaged: z.coerce
       .number()
-      .int("Dozens packaged must be a whole number")
-      .positive("Dozens packaged must be greater than 0"),
+      .int("Pieces packaged must be a whole number")
+      .positive("Pieces packaged must be greater than 0"),
     notes: optionalTrimmedString,
   })
   .strict();
@@ -92,15 +74,6 @@ export const listPackagingBatchesQuerySchema = z
     }
   });
 
-export const updateLowStockAlertSchema = z
-  .object({
-    lowStockAlertAt: z.coerce
-      .number()
-      .int("Low stock alert must be a whole number")
-      .min(0, "Low stock alert cannot be negative"),
-  })
-  .strict();
-
 export const createStockAdjustmentSchema = z
   .object({
     type: z.enum(["UNPACKAGED", "PACKAGED"]),
@@ -120,5 +93,4 @@ export type CreatePackagingBatchInput = z.infer<typeof createPackagingBatchSchem
 export type ListPackagingBatchesQuery = z.infer<
   typeof listPackagingBatchesQuerySchema
 >;
-export type UpdateLowStockAlertInput = z.infer<typeof updateLowStockAlertSchema>;
 export type CreateStockAdjustmentInput = z.infer<typeof createStockAdjustmentSchema>;

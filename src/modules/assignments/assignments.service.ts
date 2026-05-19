@@ -88,10 +88,15 @@ const ASSIGNMENT_LIST_INCLUDE = {
       name: true,
     },
   },
-  rawMaterialType: {
-    select: RAW_MATERIAL_TYPE_SELECT,
+  rawMaterialIssuances: {
+    orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+    include: {
+      materialType: {
+        select: RAW_MATERIAL_TYPE_SELECT,
+      },
+    },
   },
-} as const;
+} satisfies Prisma.WorkerAssignmentInclude;
 
 const GOODS_RETURN_WITH_CREATOR_INCLUDE = {
   createdBy: {
@@ -154,7 +159,7 @@ const getRawMaterialStock = async (
   tenantId: string,
   materialTypeId: string,
 ) => {
-  const [purchases, issuances] = await Promise.all([
+  const [purchases, issued, returned] = await Promise.all([
     client.rawMaterialPurchase.aggregate({
       where: {
         tenantId,
@@ -168,12 +173,23 @@ const getRawMaterialStock = async (
       where: {
         tenantId,
         materialTypeId,
+        movementType: "ISSUE",
+      },
+      _sum: { quantity: true },
+    }),
+    client.rawMaterialIssuance.aggregate({
+      where: {
+        tenantId,
+        materialTypeId,
+        movementType: "RETURN",
       },
       _sum: { quantity: true },
     }),
   ]);
 
-  return decimalOrZero(purchases._sum.quantity).minus(decimalOrZero(issuances._sum.quantity));
+  return decimalOrZero(purchases._sum.quantity)
+    .minus(decimalOrZero(issued._sum.quantity))
+    .plus(decimalOrZero(returned._sum.quantity));
 };
 
 const getAssignmentDetailsOrThrow = async (
@@ -188,7 +204,8 @@ const getAssignmentDetailsOrThrow = async (
     },
     include: {
       ...ASSIGNMENT_LIST_INCLUDE,
-      rawMaterialIssuance: {
+      rawMaterialIssuances: {
+        orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
         include: RAW_MATERIAL_ISSUANCE_INCLUDE,
       },
       supplementaryIssuances: {
@@ -224,8 +241,6 @@ const getAssignmentBaseOrThrow = async (
       tenantId: true,
       workerId: true,
       designId: true,
-      rawMaterialTypeId: true,
-      rawMaterialQty: true,
       expectedPieces: true,
       returnedPieces: true,
       rejectedPieces: true,
@@ -350,34 +365,43 @@ export const createAssignment = async (
       throw validationError("Design must be active to create assignments");
     }
 
-    const rawMaterialType = await tx.rawMaterialType.findFirst({
+    const requestedRawMaterials = input.rawMaterials.map((item) => ({
+      materialTypeId: item.rawMaterialTypeId,
+      quantity: new Prisma.Decimal(item.rawMaterialQty),
+    }));
+    const rawMaterialTypeIds = requestedRawMaterials.map((item) => item.materialTypeId);
+    const rawMaterialTypes = await tx.rawMaterialType.findMany({
       where: {
-        id: input.rawMaterialTypeId,
+        id: { in: rawMaterialTypeIds },
         tenantId,
         deletedAt: null,
       },
       select: RAW_MATERIAL_TYPE_SELECT,
     });
+    const rawMaterialTypeById = new Map(rawMaterialTypes.map((type) => [type.id, type]));
 
-    if (!rawMaterialType) {
-      throw notFoundError("Raw material type not found");
-    }
+    for (const requestedMaterial of requestedRawMaterials) {
+      const rawMaterialType = rawMaterialTypeById.get(requestedMaterial.materialTypeId);
 
-    if (!rawMaterialType.isActive) {
-      throw validationError("Raw material type must be active");
-    }
+      if (!rawMaterialType) {
+        throw notFoundError("Raw material type not found");
+      }
 
-    const requestedRawMaterialQty = new Prisma.Decimal(input.rawMaterialQty);
-    const availableRawMaterialStock = await getRawMaterialStock(
-      tx,
-      tenantId,
-      input.rawMaterialTypeId,
-    );
+      if (!rawMaterialType.isActive) {
+        throw validationError(`${rawMaterialType.name} raw material type must be active`);
+      }
 
-    if (availableRawMaterialStock.lt(requestedRawMaterialQty)) {
-      throw validationError(
-        `Insufficient raw material stock. Available: ${availableRawMaterialStock.toString()} ${rawMaterialType.unit}, Requested: ${requestedRawMaterialQty.toString()} ${rawMaterialType.unit}`,
+      const availableRawMaterialStock = await getRawMaterialStock(
+        tx,
+        tenantId,
+        requestedMaterial.materialTypeId,
       );
+
+      if (availableRawMaterialStock.lt(requestedMaterial.quantity)) {
+        throw validationError(
+          `Insufficient raw material stock for ${rawMaterialType.name}. Available: ${availableRawMaterialStock.toString()} ${rawMaterialType.unit}, Requested: ${requestedMaterial.quantity.toString()} ${rawMaterialType.unit}`,
+        );
+      }
     }
 
     const supplementaryNeeds = await tx.designSupplementaryNeed.findMany({
@@ -414,8 +438,6 @@ export const createAssignment = async (
         tenantId,
         workerId: input.workerId,
         designId: input.designId,
-        rawMaterialTypeId: input.rawMaterialTypeId,
-        rawMaterialQty: requestedRawMaterialQty,
         expectedPieces: input.expectedPieces,
         pieceRateAtAssignment: design.pieceRateRs,
         totalEarned: new Prisma.Decimal(0),
@@ -427,15 +449,16 @@ export const createAssignment = async (
       select: { id: true },
     });
 
-    await tx.rawMaterialIssuance.create({
-      data: {
+    await tx.rawMaterialIssuance.createMany({
+      data: requestedRawMaterials.map((requestedMaterial) => ({
         tenantId,
-        materialTypeId: input.rawMaterialTypeId,
+        materialTypeId: requestedMaterial.materialTypeId,
         assignmentId: assignment.id,
-        quantity: requestedRawMaterialQty,
+        movementType: "ISSUE",
+        quantity: requestedMaterial.quantity,
         notes: normalizeOptionalString(input.notes),
         createdById,
-      },
+      })),
     });
 
     for (const issuance of supplementaryIssuances) {
@@ -520,21 +543,81 @@ export const closeAssignment = async (
 ) => {
   await assertTenantAccess(tenantId, currentUser);
 
-  const assignment = await getAssignmentBaseOrThrow(prisma, tenantId, assignmentId);
+  await prisma.$transaction(async (tx) => {
+    const assignment = await getAssignmentBaseOrThrow(tx, tenantId, assignmentId);
 
-  if (assignment.status === "COMPLETED" || assignment.status === "CLOSED") {
-    throw validationError("Assignment is already completed or closed");
-  }
+    if (assignment.status === "COMPLETED" || assignment.status === "CLOSED") {
+      throw validationError("Assignment is already completed or closed");
+    }
 
-  return prisma.workerAssignment.update({
-    where: { id: assignmentId },
-    data: {
-      status: "CLOSED",
-      notes: notes.trim(),
-      completedAt: new Date(),
-    },
-    include: ASSIGNMENT_LIST_INCLUDE,
+    const rawMaterialMovements = await tx.rawMaterialIssuance.groupBy({
+      by: ["materialTypeId", "movementType"],
+      where: {
+        tenantId,
+        assignmentId,
+      },
+      _sum: { quantity: true },
+    });
+
+    const issuedByMaterialType = new Map<string, Prisma.Decimal>();
+    const returnedByMaterialType = new Map<string, Prisma.Decimal>();
+
+    for (const movement of rawMaterialMovements) {
+      const quantity = decimalOrZero(movement._sum.quantity);
+      if (movement.movementType === "RETURN") {
+        returnedByMaterialType.set(movement.materialTypeId, quantity);
+      } else {
+        issuedByMaterialType.set(movement.materialTypeId, quantity);
+      }
+    }
+
+    const producedPieces = assignment.returnedPieces + assignment.rejectedPieces;
+    const remainingPieces = Math.max(assignment.expectedPieces - producedPieces, 0);
+    const remainingRatio = new Prisma.Decimal(remainingPieces).div(assignment.expectedPieces);
+    const closedAt = new Date();
+
+    const returnMovements = Array.from(issuedByMaterialType.entries())
+      .map(([materialTypeId, issuedQuantity]) => {
+        const alreadyReturnedQuantity =
+          returnedByMaterialType.get(materialTypeId) ?? new Prisma.Decimal(0);
+        const returnQuantity = issuedQuantity
+          .mul(remainingRatio)
+          .minus(alreadyReturnedQuantity)
+          .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
+
+        return {
+          materialTypeId,
+          quantity: returnQuantity,
+        };
+      })
+      .filter((movement) => movement.quantity.gt(0));
+
+    if (returnMovements.length > 0) {
+      await tx.rawMaterialIssuance.createMany({
+        data: returnMovements.map((movement) => ({
+          tenantId,
+          materialTypeId: movement.materialTypeId,
+          assignmentId,
+          movementType: "RETURN",
+          quantity: movement.quantity,
+          issuedAt: closedAt,
+          notes: `Assignment closed: ${notes.trim()}`,
+          createdById: currentUser.userId,
+        })),
+      });
+    }
+
+    await tx.workerAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        status: "CLOSED",
+        notes: notes.trim(),
+        completedAt: closedAt,
+      },
+    });
   });
+
+  return getAssignmentDetailsOrThrow(prisma, tenantId, assignmentId);
 };
 
 export const recordGoodsReturn = async (

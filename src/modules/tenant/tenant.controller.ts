@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import fs from "fs/promises";
 import { z } from "zod";
 
 import type { AuthenticatedRequest } from "../../types/auth.types";
 import { validationError } from "../../common/errors/app-error";
+import { toLocalStoragePath } from "../../middleware/upload.middleware";
 import { successResponse } from "../../utils/response";
 import * as tenantService from "./tenant.service";
 
@@ -12,7 +14,6 @@ const createTenantSchema = z.object({
   email: z.string().email("Invalid tenant email").optional(),
   phone: z.string().trim().min(6, "Phone must be at least 6 digits").optional(),
   address: z.string().trim().optional(),
-  logoUrl: z.string().url("Logo URL must be a valid URL").optional(),
   businessCategory: z.string().trim().optional(),
 });
 
@@ -29,13 +30,22 @@ export const createTenant = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
+  const uploadedLogo = req.file;
+
   try {
     const authReq = req as AuthenticatedRequest;
-    const input = parseOrThrow(createTenantSchema, req.body);
+    const input = {
+      ...parseOrThrow(createTenantSchema, req.body),
+      logoUrl: uploadedLogo ? toLocalStoragePath(uploadedLogo.path) : undefined,
+    };
     const tenant = await tenantService.createTenant(input, authReq.user.userId);
 
     successResponse(res, tenant, 201);
   } catch (error) {
+    if (uploadedLogo) {
+      await fs.unlink(uploadedLogo.path).catch(() => undefined);
+    }
+
     next(error);
   }
 };
